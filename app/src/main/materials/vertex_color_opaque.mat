@@ -1,0 +1,15 @@
+material {
+    name : vertexColorOpaque,
+    shadingModel : unlit,
+    blending : opaque,
+    requires : [ position, color ],
+    doubleSided : true,
+    parameters : []
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        material.baseColor = getColor();
+    }
+}
