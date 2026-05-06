@@ -9,15 +9,15 @@ plugins {
 
 android {
     namespace = "io.github.takarakasai.misattitude"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         // applicationId は Google Play 公開時に固定される一意の ID。
         // 一度公開すると変更不可なので慎重に。
         applicationId = "io.github.takarakasai.misattitude"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 2
+        targetSdk = 35
+        versionCode = 4
         versionName = "1.0"
     }
 

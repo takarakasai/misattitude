@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -74,7 +75,13 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    // Android 15 (API 35) の edge-to-edge enforcement に対応。
+    // ルートに systemBarsPadding() を当てて、ステータスバー / ナビゲーションバーと
+    // UI が重ならないようにする。
+    Surface(
+        modifier = Modifier.fillMaxSize().systemBarsPadding(),
+        color = MaterialTheme.colorScheme.background
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // ─── Compact 1-line summary; tap to open the settings bottom sheet ───
             ConventionSummaryBar(
