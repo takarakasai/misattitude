@@ -21,23 +21,28 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import io.github.takarakasai.misattitude.domain.Quaternion
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.sqrt
 
 /**
  * Quaternion attitude-input panel: 4 sliders (w / x / y / z, each ranged -1..+1)
- * editing a local **draft**. The body attitude is updated only when the user taps
- * ✓ Apply (deferred-apply pattern shared with EulerPanel). Below the sliders, a
- * live axis-angle preview shows what the *normalized* draft represents — so the
- * user can dial values and see immediately how they'd be interpreted as a rotation,
- * without committing.
+ * driving the body attitude in **real time** — every drag step pushes the current
+ * (raw, un-normalized) draft through `onQuaternionChange`, the ViewModel normalises
+ * + canonicalises before storing.
  *
- * Why sliders instead of text fields:
- *   - For a teaching tool, "drag and watch what changes" beats "type 0.7071…"
- *   - Sliders make the unit-norm constraint visible: pulling one component up
- *     forces the others to relatively shrink after normalization
- *   - The axis-angle readout doubles as a sanity check that the chosen quaternion
- *     is meaningful (e.g. ±1 in w with everything else 0 = identity)
+ * Why a local draft instead of binding sliders directly to `canonical`:
+ *   The displayed quaternion in the ViewModel is always unit-norm. If we bound the
+ *   w slider directly to `canonical.w`, dragging w from 1.0 → 0.5 with x=y=z=0
+ *   would normalise back to (1, 0, 0, 0) on every step and the slider thumb would
+ *   "snap back" to where the user just dragged from. Keeping a raw draft preserves
+ *   the values the user actually set; the **conditional** resync below only fires
+ *   when canonical changes from outside (Reset attitude, Euler-tab edits, playback)
+ *   and not when our own commit comes back round-tripped to the same unit q.
+ *
+ * Below the sliders, an axis-angle preview shows what the *normalized* draft
+ * represents — useful as a sanity-check (e.g. ±1 in w with everything else 0 means
+ * identity).
  */
 @Composable
 fun QuaternionPanel(
@@ -45,36 +50,50 @@ fun QuaternionPanel(
     onQuaternionChange: (Quaternion) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Local raw draft (NOT normalized); editing one slider does not auto-shrink
-    // the others, so the user can see the un-normalized state. The displayed
-    // axis-angle and the on-Apply commit both go through normalization.
     var draftW by remember { mutableStateOf(canonical.w.toFloat()) }
     var draftX by remember { mutableStateOf(canonical.x.toFloat()) }
     var draftY by remember { mutableStateOf(canonical.y.toFloat()) }
     var draftZ by remember { mutableStateOf(canonical.z.toFloat()) }
+
+    // Conditional resync: only overwrite the draft when canonical has moved AWAY
+    // from what our draft already represents. We compare draft.normalized().canonical()
+    // against canonical (already canonical, unit-norm). If they match within epsilon,
+    // the canonical change is a round-trip from our own commit and we keep the
+    // user's raw draft values. If they differ, an external actor (Reset attitude,
+    // Euler tab, playback) changed the attitude and we sync to it.
     LaunchedEffect(canonical) {
-        // Resync from upstream whenever canonical changes externally (Reset
-        // attitude / Euler edit applied / playback driving the canonical state).
-        draftW = canonical.w.toFloat()
-        draftX = canonical.x.toFloat()
-        draftY = canonical.y.toFloat()
-        draftZ = canonical.z.toFloat()
+        val n = sqrt(
+            (draftW * draftW + draftX * draftX + draftY * draftY + draftZ * draftZ).toDouble()
+        )
+        val matchesExisting = if (n < 1e-9) {
+            false
+        } else {
+            val nq = Quaternion(
+                draftW.toDouble() / n,
+                draftX.toDouble() / n,
+                draftY.toDouble() / n,
+                draftZ.toDouble() / n,
+            ).canonical()
+            val cq = canonical.canonical()
+            abs(nq.w - cq.w) < 1e-4 &&
+                abs(nq.x - cq.x) < 1e-4 &&
+                abs(nq.y - cq.y) < 1e-4 &&
+                abs(nq.z - cq.z) < 1e-4
+        }
+        if (!matchesExisting) {
+            draftW = canonical.w.toFloat()
+            draftX = canonical.x.toFloat()
+            draftY = canonical.y.toFloat()
+            draftZ = canonical.z.toFloat()
+        }
     }
 
-    val draftQ = Quaternion(draftW.toDouble(), draftX.toDouble(), draftY.toDouble(), draftZ.toDouble())
-    // Equality vs. canonical: compare normalized draft vs. canonical (already a
-    // unit quaternion). We canonicalise both sides to avoid the double-cover
-    // pitfall (q and -q represent the same rotation).
-    val isDirty = run {
-        val n = draftQ.norm()
-        if (n < 1e-9) true else {
-            val a = canonical.canonical()
-            val b = draftQ.normalized().canonical()
-            kotlin.math.abs(a.w - b.w) > 1e-4 ||
-                kotlin.math.abs(a.x - b.x) > 1e-4 ||
-                kotlin.math.abs(a.y - b.y) > 1e-4 ||
-                kotlin.math.abs(a.z - b.z) > 1e-4
-        }
+    /** Push the four current draft values to the ViewModel. Centralised so all four
+     *  sliders (and any future input source) commit through the same code path. */
+    fun commit() {
+        onQuaternionChange(
+            Quaternion(draftW.toDouble(), draftX.toDouble(), draftY.toDouble(), draftZ.toDouble())
+        )
     }
 
     Column(
@@ -83,34 +102,34 @@ fun QuaternionPanel(
     ) {
         Text(
             "Hamilton convention: q = w + x i + y j + z k. Sliders edit raw components in -1..+1; " +
-                "the value is normalised to a unit quaternion on Apply.",
+                "the value is normalised to a unit quaternion before being applied.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ComponentSlider("w", draftW) { draftW = it }
-        ComponentSlider("x", draftX) { draftX = it }
-        ComponentSlider("y", draftY) { draftY = it }
-        ComponentSlider("z", draftZ) { draftZ = it }
+        ComponentSlider("w", draftW) { draftW = it; commit() }
+        ComponentSlider("x", draftX) { draftX = it; commit() }
+        ComponentSlider("y", draftY) { draftY = it; commit() }
+        ComponentSlider("z", draftZ) { draftZ = it; commit() }
 
         // Live axis-angle preview computed from the *normalized* draft. If the
         // raw draft has near-zero norm (all sliders at 0) we say so explicitly —
-        // a zero quaternion isn't a rotation and Apply will be rejected.
+        // a zero quaternion isn't a rotation; ViewModel.setQuaternion rejects it.
         val axisAngleText = run {
-            val n = draftQ.norm()
-            if (n < 1e-9) {
+            val n2 = draftW * draftW + draftX * draftX + draftY * draftY + draftZ * draftZ
+            if (n2 < 1e-9f) {
                 "axis = ?, angle = ? — draft norm is zero (move a slider)"
             } else {
-                val q = draftQ.normalized()
-                val w = q.w.coerceIn(-1.0, 1.0)
+                val n = sqrt(n2.toDouble())
+                val w = (draftW.toDouble() / n).coerceIn(-1.0, 1.0)
                 val angleDeg = 2.0 * acos(w) * 180.0 / PI
                 val sinHalf = sqrt(1.0 - w * w)
                 if (sinHalf < 1e-9) {
                     "axis = (1, 0, 0), angle = 0.00°  (identity)"
                 } else {
-                    val ax = q.x / sinHalf
-                    val ay = q.y / sinHalf
-                    val az = q.z / sinHalf
+                    val ax = draftX.toDouble() / n / sinHalf
+                    val ay = draftY.toDouble() / n / sinHalf
+                    val az = draftZ.toDouble() / n / sinHalf
                     "axis = (%+.3f, %+.3f, %+.3f), angle = %.2f°".format(ax, ay, az, angleDeg)
                 }
             }
@@ -118,22 +137,6 @@ fun QuaternionPanel(
         Text(
             text = axisAngleText,
             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-        )
-
-        ApplyRevertRow(
-            isDirty = isDirty,
-            onRevert = {
-                draftW = canonical.w.toFloat()
-                draftX = canonical.x.toFloat()
-                draftY = canonical.y.toFloat()
-                draftZ = canonical.z.toFloat()
-            },
-            onApply = {
-                // ViewModel.setQuaternion already rejects zero-norm; passing the
-                // raw draft is fine and lets the ViewModel's normalisation /
-                // canonicalisation paths do their job.
-                onQuaternionChange(draftQ)
-            },
         )
     }
 }

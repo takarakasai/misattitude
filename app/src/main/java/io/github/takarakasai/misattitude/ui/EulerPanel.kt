@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -20,7 +19,6 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,12 +68,11 @@ private val properEulerOrders = listOf(
  * shared SettingsBottomSheet on MainScreen, so this panel can stay focused on the
  * frequently-touched sliders.
  *
- * Edit model: **deferred apply**. Slider drags update a local "draft" only;
- * the body attitude is updated only when the user taps ✓ Apply. This avoids the
- * "every micro-twitch redraws everything" feel and lets the user dial in a value
- * deliberately. ↺ Revert discards pending changes. The draft auto-resets to the
- * applied value whenever `canonical` or `convention` changes from outside (e.g.
- * Reset attitude, Settings convention switch, playback driving canonical).
+ * Edit model: **immediate apply** — every slider drag re-computes the quaternion
+ * and pushes it through `onAnglesChange`, so the 3D scene tracks the slider in
+ * real time. The slider value is bound directly to the angles extracted from the
+ * current canonical, which means after-commit corrections (gimbal-lock pinning,
+ * floating-point round-trip) appear automatically. No local draft state.
  */
 @Composable
 fun EulerPanel(
@@ -85,29 +82,11 @@ fun EulerPanel(
     modifier: Modifier = Modifier,
 ) {
     val extraction = Conversions.quaternionToEuler(canonical, convention)
-    val applied = extraction.angles
+    val angles = extraction.angles
     val isLocked = extraction.gimbalLock
     // "Near" gimbal lock: a2 within ~3° of the singularity. Warns the user before
     // they actually hit the wall, so they can see the dynamics ramping up.
-    val isNearLock = !isLocked && Conversions.isNearGimbalLock(applied, convention, eps = degreesAsRad(3.0))
-
-    // Local draft state (in radians, same as the EulerAngles domain type).
-    // Only this state changes while the user is dragging. Apply commits to upstream.
-    var draftA1 by remember { mutableStateOf(applied.a1) }
-    var draftA2 by remember { mutableStateOf(applied.a2) }
-    var draftA3 by remember { mutableStateOf(applied.a3) }
-    LaunchedEffect(canonical, convention) {
-        // Sync draft when the upstream attitude or convention changes from outside
-        // (Reset attitude / Settings switch / playback). Without this, the slider
-        // would freeze at its old draft after such an event.
-        draftA1 = applied.a1
-        draftA2 = applied.a2
-        draftA3 = applied.a3
-    }
-    val isDirty =
-        kotlin.math.abs(draftA1 - applied.a1) > 1e-6 ||
-        kotlin.math.abs(draftA2 - applied.a2) > 1e-6 ||
-        kotlin.math.abs(draftA3 - applied.a3) > 1e-6
+    val isNearLock = !isLocked && Conversions.isNearGimbalLock(angles, convention, eps = degreesAsRad(3.0))
 
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -142,22 +121,22 @@ fun EulerPanel(
         }
         AngleSlider(
             label = "${convention.axis1.name}₁ (a1)",
-            valueDeg = draftA1.toDeg(),
+            valueDeg = angles.a1.toDeg(),
             warning = warnLevel,
-            onChange = { newDeg -> draftA1 = newDeg.toRad() },
+            onChange = { newDeg -> onAnglesChange(EulerAngles(newDeg.toRad(), angles.a2, angles.a3)) },
         )
         AngleSlider(
             label = "${convention.axis2.name}₂ (a2)",
-            valueDeg = draftA2.toDeg(),
+            valueDeg = angles.a2.toDeg(),
             range = if (convention.isTaitBryan) -90f..90f else 0f..180f,
             warning = WarnLevel.None,
-            onChange = { newDeg -> draftA2 = newDeg.toRad() },
+            onChange = { newDeg -> onAnglesChange(EulerAngles(angles.a1, newDeg.toRad(), angles.a3)) },
         )
         AngleSlider(
             label = "${convention.axis3.name}₃ (a3)",
-            valueDeg = draftA3.toDeg(),
+            valueDeg = angles.a3.toDeg(),
             warning = warnLevel,
-            onChange = { newDeg -> draftA3 = newDeg.toRad() },
+            onChange = { newDeg -> onAnglesChange(EulerAngles(angles.a1, angles.a2, newDeg.toRad())) },
         )
 
         Text(
@@ -165,45 +144,6 @@ fun EulerPanel(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
-        ApplyRevertRow(
-            isDirty = isDirty,
-            onRevert = {
-                draftA1 = applied.a1
-                draftA2 = applied.a2
-                draftA3 = applied.a3
-            },
-            onApply = {
-                onAnglesChange(EulerAngles(draftA1, draftA2, draftA3))
-            },
-        )
-    }
-}
-
-/** Pending-edit footer used by the Euler/Quaternion panels. ✓ commits the draft,
- *  ↺ discards. Both buttons are disabled when there is nothing to apply, so an
- *  unchanged panel reads as inert and the user knows they are looking at the
- *  currently-applied value. */
-@Composable
-internal fun ApplyRevertRow(
-    isDirty: Boolean,
-    onRevert: () -> Unit,
-    onApply: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (isDirty) {
-            Text(
-                "Pending — tap ✓ to apply",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
-        }
-        OutlinedButton(onClick = onRevert, enabled = isDirty) { Text("↺ Revert") }
-        Button(onClick = onApply, enabled = isDirty) { Text("✓ Apply") }
     }
 }
 
