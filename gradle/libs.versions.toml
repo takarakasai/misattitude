@@ -7,6 +7,7 @@ activityCompose = "1.9.2"
 composeBom = "2024.09.03"
 filament = "1.54.5"
 playServicesAds = "23.4.0"
+billing = "7.1.1"
 junit = "4.13.2"
 
 [libraries]
@@ -27,6 +28,7 @@ filament-android = { group = "com.google.android.filament", name = "filament-and
 filament-utils-android = { group = "com.google.android.filament", name = "filament-utils-android", version.ref = "filament" }
 
 play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "playServicesAds" }
+billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 

@@ -63,6 +63,12 @@ import io.github.takarakasai.misattitude.gl.FilamentSurfaceView
 fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
+    // Resolve the hosting Activity once — needed to start the Play Billing
+    // purchase flow, which (unlike most Android APIs) requires an Activity
+    // rather than any Context. Wrapped in remember so the cast is paid once
+    // per composition tree, not on every recomposition.
+    val screenContext = LocalContext.current
+    val activity = remember(screenContext) { screenContext.findActivity() }
 
     // Animation pump while playing.
     LaunchedEffect(state.isPlaying) {
@@ -190,6 +196,12 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                 onRoboticsPreset = viewModel::applyRoboticsPreset,
                 onBodyShapeChange = viewModel::setBodyShape,
                 onConventionChange = viewModel::setConvention,
+                proPriceFormatted = viewModel.proPriceFormatted,
+                // launchProPurchase is only invoked from a button that exists
+                // when activity != null, so the !! cannot actually trip — but
+                // we guard with a no-op fallback to keep the type system happy.
+                onBuyPro = { activity?.let(viewModel::launchProPurchase) },
+                onRestorePurchases = viewModel::restorePurchases,
                 onDismiss = { showSettings = false },
             )
         }
@@ -289,6 +301,9 @@ private fun SettingsBottomSheet(
     onRoboticsPreset: () -> Unit,
     onBodyShapeChange: (BodyShape) -> Unit,
     onConventionChange: (EulerConvention) -> Unit,
+    proPriceFormatted: String,
+    onBuyPro: () -> Unit,
+    onRestorePurchases: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -445,9 +460,72 @@ private fun SettingsBottomSheet(
                 )
             }
 
+            HorizontalDivider()
+
+            // ── Pro upgrade (in-app purchase) ──
+            // One-shot non-consumable that removes the AdMob banner. Two UI
+            // states:
+            //   * not owned → "Remove ads — <price>" primary button +
+            //                  smaller "Restore purchases" outlined button
+            //                  (for users who reinstall / switch device).
+            //   * owned     → "Pro active ✓" text + still expose Restore so
+            //                  support can guide users with mis-synced state.
+            // Price text comes from Google Play (already-localised currency
+            // string from ProductDetails) so we never hard-code "$5" in code.
+            Text(
+                "Pro upgrade",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            if (state.proActive) {
+                Text(
+                    "✓  Pro version active — ads disabled",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                OutlinedButton(
+                    onClick = onRestorePurchases,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Restore purchases") }
+            } else {
+                Text(
+                    "Remove the banner ad with a one-time purchase. Lifetime entitlement, " +
+                        "applied automatically across all your devices signed in to the " +
+                        "same Google account.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    androidx.compose.material3.Button(
+                        onClick = onBuyPro,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        val priceTail = if (proPriceFormatted.isNotEmpty()) "  —  $proPriceFormatted" else ""
+                        Text("Remove ads$priceTail")
+                    }
+                    OutlinedButton(
+                        onClick = onRestorePurchases,
+                    ) { Text("Restore") }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+/**
+ * Walk the [ContextWrapper] chain to find the hosting [Activity]. Compose can
+ * be invoked under non-Activity Contexts (Previews, AndroidViewBinding, etc.),
+ * so callers that need an Activity must check for null and degrade gracefully.
+ */
+private tailrec fun android.content.Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> this.baseContext.findActivity()
+    else -> null
 }
 
 /** Common row layout used inside the bottom sheet: a fixed-width left label and a

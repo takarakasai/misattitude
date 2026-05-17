@@ -109,6 +109,11 @@ dependencies {
     // only outbound network in the entire app.
     implementation(libs.play.services.ads)
 
+    // Google Play Billing Library — one non-consumable IAP ("Pro upgrade")
+    // that disables the AdMob banner. The -ktx variant adds coroutine-friendly
+    // suspend wrappers around the otherwise-callback-based BillingClient API.
+    implementation(libs.billing.ktx)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

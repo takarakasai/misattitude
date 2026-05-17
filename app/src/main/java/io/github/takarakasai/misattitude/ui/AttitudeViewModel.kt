@@ -1,6 +1,10 @@
 ﻿package io.github.takarakasai.misattitude.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Activity
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import io.github.takarakasai.misattitude.MisattitudeApplication
 import io.github.takarakasai.misattitude.domain.BodyShape
 import io.github.takarakasai.misattitude.domain.Conversions
 import io.github.takarakasai.misattitude.domain.EulerAngles
@@ -16,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 enum class PlaybackMode {
     /** Geodesic on the unit-quaternion sphere — the "natural" attitude path. */
@@ -30,7 +35,14 @@ enum class PlaybackMode {
     Step,
 }
 
-class AttitudeViewModel : ViewModel() {
+class AttitudeViewModel(application: Application) : AndroidViewModel(application) {
+
+    // Access the process-wide BillingRepository so the ViewModel can:
+    //   - observe entitlement changes and mirror them into UiState.proActive
+    //   - forward "Buy Pro" / "Restore purchases" intents from the UI
+    // Using getApplication() (provided by AndroidViewModel) is the standard
+    // way to reach process-scoped singletons without DI infrastructure.
+    private val billing = (application as MisattitudeApplication).billingRepository
 
     data class UiState(
         val canonical: Quaternion = Quaternion.IDENTITY,
@@ -56,8 +68,34 @@ class AttitudeViewModel : ViewModel() {
         val proActive: Boolean = false,
     )
 
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(UiState(proActive = billing.proPurchased.value))
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    init {
+        // Mirror entitlement changes from BillingRepository into UiState so
+        // anything observing UiState (MainScreen → AdBanner show/hide,
+        // Settings sheet About → button text) updates reactively without
+        // each call site needing its own subscription.
+        viewModelScope.launch {
+            billing.proPurchased.collect { pro ->
+                _state.update { it.copy(proActive = pro) }
+            }
+        }
+    }
+
+    // ─── Billing UI hooks ───────────────────────────────────────────────────
+
+    /** Launch the Google Play purchase sheet for the Pro upgrade. Result lands
+     *  via the entitlement flow above; nothing else needed in the UI. */
+    fun launchProPurchase(activity: Activity) = billing.launchPurchaseFlow(activity)
+
+    /** Re-query Google for purchases — used by the "Restore purchases" button
+     *  for users who reinstall or switch devices. */
+    fun restorePurchases() = billing.restorePurchases()
+
+    /** Localised price string for the Pro SKU, e.g. "¥800" or "$5.00". May be
+     *  empty briefly at app start before ProductDetails has loaded. */
+    val proPriceFormatted: String get() = billing.proPriceFormatted
 
     // --- direct attitude edits ---
 
