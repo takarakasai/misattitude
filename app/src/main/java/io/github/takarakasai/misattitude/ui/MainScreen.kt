@@ -182,6 +182,17 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
             // to zero height (the panel above takes the freed space via its
             // weight(1f) modifier).
             if (!state.proActive) {
+                // "Tap to remove ads" call-to-action shown directly above the
+                // banner. Visual link: the user sees the ad, and the row right
+                // above it offers the way out. Tapping launches the purchase
+                // flow without going through the Settings sheet, which is the
+                // cheapest possible conversion path for users who already
+                // decided they want the upgrade.
+                RemoveAdsCta(
+                    priceFormatted = viewModel.proPriceFormatted,
+                    onBuyPro = { activity?.let(viewModel::launchProPurchase) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 AdBanner(modifier = Modifier.fillMaxWidth())
             }
         }
@@ -526,6 +537,96 @@ private tailrec fun android.content.Context.findActivity(): android.app.Activity
     is android.app.Activity -> this
     is android.content.ContextWrapper -> this.baseContext.findActivity()
     else -> null
+}
+
+/**
+ * Pro-upgrade call-to-action sitting directly above the AdMob banner.
+ * Purpose: give users who notice the banner a one-tap path to the purchase
+ * flow without making them hunt through Settings.
+ *
+ * Why two lines / why a "PRO" badge:
+ *
+ *   The initial single-line version ("✨ Remove ads — ¥800") read more like a
+ *   status row than an offer, and user feedback was that the banner alone
+ *   wasn't motivating enough to drive conversions. This version is louder by
+ *   design:
+ *
+ *     * A small "PRO" pill on the left visually anchors the row as a product
+ *       offering, not just another setting.
+ *     * Two lines of copy — headline (action) + subline (benefits) — leave
+ *       room to sell "Support development" alongside "no more ads", which is
+ *       a real motivator for educational-app users who tend to be sympathetic
+ *       to indie developers.
+ *     * The price ("¥800 · one-time") is its own column on the right so it
+ *       reads as a discrete commitment, not buried mid-sentence.
+ *
+ *   We still use `primaryContainer` colour rather than a flashy accent: the
+ *   row should read as inviting, not desperate.
+ */
+@Composable
+private fun RemoveAdsCta(
+    priceFormatted: String,
+    onBuyPro: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        onClick = onBuyPro,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // PRO badge — a small filled pill on `primary` (not container) so
+            // it stands out against the row's `primaryContainer` background.
+            Surface(
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Text(
+                    text = "✨ PRO",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+
+            // Headline + subline. weight(1f) lets the price column on the
+            // right hug its content while this column absorbs slack.
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Remove ads forever",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = "Support development · one-time purchase",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                )
+            }
+
+            // Price (if known) shown on the right. When the BillingClient
+            // hasn't yet loaded ProductDetails we just omit the column rather
+            // than show a placeholder — better to wait until Play returns the
+            // localised string than to flash "—" at the user.
+            if (priceFormatted.isNotEmpty()) {
+                Text(
+                    text = priceFormatted,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
 }
 
 /** Common row layout used inside the bottom sheet: a fixed-width left label and a
