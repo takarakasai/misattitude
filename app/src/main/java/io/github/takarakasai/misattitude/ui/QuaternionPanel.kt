@@ -5,9 +5,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +54,12 @@ fun QuaternionPanel(
     canonical: Quaternion,
     onQuaternionChange: (Quaternion) -> Unit,
     modifier: Modifier = Modifier,
+    /** When false, sliders are disabled and a Pro-upgrade banner sits at the
+     *  top. The numeric readout still updates, so the user can watch how
+     *  Euler/Matrix edits move w/x/y/z in real time — they just can't drive
+     *  the sliders themselves until they upgrade. */
+    editable: Boolean = true,
+    onBuyPro: () -> Unit = {},
 ) {
     var draftW by remember { mutableStateOf(canonical.w.toFloat()) }
     var draftX by remember { mutableStateOf(canonical.x.toFloat()) }
@@ -100,6 +111,18 @@ fun QuaternionPanel(
         modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        // Free-tier explanation row. We deliberately do NOT hide the panel
+        // when uneditable — readers still benefit from seeing how their Euler
+        // / Matrix edits map onto a quaternion in real time. We only gate
+        // *editing* the quaternion directly.
+        if (!editable) {
+            ProUpgradeInlineBanner(
+                message = "Quaternion editing is a Pro feature. Values update live as you " +
+                    "edit Euler / Matrix — upgrade to drag w/x/y/z directly.",
+                onBuyPro = onBuyPro,
+            )
+        }
+
         Text(
             "Hamilton convention: q = w + x i + y j + z k. Sliders edit raw components in -1..+1; " +
                 "the value is normalised to a unit quaternion before being applied.",
@@ -107,10 +130,10 @@ fun QuaternionPanel(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ComponentSlider("w", draftW) { draftW = it; commit() }
-        ComponentSlider("x", draftX) { draftX = it; commit() }
-        ComponentSlider("y", draftY) { draftY = it; commit() }
-        ComponentSlider("z", draftZ) { draftZ = it; commit() }
+        ComponentSlider("w", draftW, enabled = editable) { draftW = it; commit() }
+        ComponentSlider("x", draftX, enabled = editable) { draftX = it; commit() }
+        ComponentSlider("y", draftY, enabled = editable) { draftY = it; commit() }
+        ComponentSlider("z", draftZ, enabled = editable) { draftZ = it; commit() }
 
         // Live axis-angle preview computed from the *normalized* draft. If the
         // raw draft has near-zero norm (all sliders at 0) we say so explicitly —
@@ -150,6 +173,7 @@ fun QuaternionPanel(
 private fun ComponentSlider(
     label: String,
     value: Float,
+    enabled: Boolean = true,
     onChange: (Float) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -163,7 +187,44 @@ private fun ComponentSlider(
             value = value.coerceIn(-1f, 1f),
             onValueChange = onChange,
             valueRange = -1f..1f,
+            enabled = enabled,
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+/**
+ * Thin pill-shaped banner inviting the user to upgrade to Pro, used at the top
+ * of panels that are partially or fully read-only on the free tier. Tap
+ * launches the purchase flow directly.
+ */
+@Composable
+internal fun ProUpgradeInlineBanner(
+    message: String,
+    onBuyPro: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        onClick = onBuyPro,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "🔒  $message",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }

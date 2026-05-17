@@ -66,5 +66,32 @@ data class EulerConvention(
         }
 
         val DEFAULT = EulerConvention(Axis.Z, Axis.Y, Axis.X, FrameKind.Intrinsic)
+
+        /**
+         * Conventions available in the **free version**. The set is chosen to
+         * cover the conventions most users encounter in practice — across
+         * aviation/robotics, SLAM, classical mechanics, and computer graphics
+         * — while keeping the remaining 8 behind the Pro upgrade as a
+         * monetisation lever.
+         *
+         *   * ZYX intrinsic — yaw / pitch / roll. Aviation, robotics.
+         *   * ZYX extrinsic — same axes, fixed frame. Very common in SLAM and
+         *     state-estimation papers.
+         *   * ZYZ intrinsic — the "classical Euler angles" of physics textbooks.
+         *   * XYZ intrinsic — Blender / Maya default for graphics.
+         *
+         * Free users can still see "12 conventions exist" thanks to the dropdown
+         * (Pro-only entries are visually marked but visible), so the
+         * differentiating feature isn't hidden — it's just gated.
+         */
+        val FREE_CONVENTIONS: Set<EulerConvention> = setOf(
+            EulerConvention(Axis.Z, Axis.Y, Axis.X, FrameKind.Intrinsic),
+            EulerConvention(Axis.Z, Axis.Y, Axis.X, FrameKind.Extrinsic),
+            EulerConvention(Axis.Z, Axis.Y, Axis.Z, FrameKind.Intrinsic),
+            EulerConvention(Axis.X, Axis.Y, Axis.Z, FrameKind.Intrinsic),
+        )
     }
+
+    /** True iff this convention is selectable without the Pro upgrade. */
+    val isFree: Boolean get() = this in FREE_CONVENTIONS
 }

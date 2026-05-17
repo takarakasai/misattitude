@@ -76,9 +76,17 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
         // anything observing UiState (MainScreen → AdBanner show/hide,
         // Settings sheet About → button text) updates reactively without
         // each call site needing its own subscription.
+        //
+        // When entitlement transitions Pro → Free (refund / billing-hold),
+        // also snap any Pro-only selections back to a free default so the
+        // UI doesn't keep editing locked content under a free user.
         viewModelScope.launch {
             billing.proPurchased.collect { pro ->
-                _state.update { it.copy(proActive = pro) }
+                _state.update { s ->
+                    val nextShape = if (!pro && !s.bodyShape.isFree) BodyShape.Cube else s.bodyShape
+                    val nextConv = if (!pro && !s.convention.isFree) EulerConvention.DEFAULT else s.convention
+                    s.copy(proActive = pro, bodyShape = nextShape, convention = nextConv)
+                }
             }
         }
     }
@@ -115,6 +123,10 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setConvention(c: EulerConvention) {
+        // Defensive gate: even if the UI somehow surfaces a Pro-only convention
+        // to a free user (e.g. stale state, deep link), refuse to switch to it.
+        // This keeps the entitlement check authoritative in one place.
+        if (!c.isFree && !_state.value.proActive) return
         _state.update { it.copy(convention = c) }
     }
 
@@ -135,6 +147,10 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
     fun applyGraphicsPreset() = setWorldConvention(WorldConvention.GraphicsDefault)
 
     fun setBodyShape(shape: BodyShape) {
+        // Same defensive gate as setConvention: Pro-only body shapes (Teapot,
+        // Spot) require an active Pro entitlement. UI chips guard against this
+        // already; this catches any path that bypasses the UI.
+        if (!shape.isFree && !_state.value.proActive) return
         _state.update { it.copy(bodyShape = shape) }
     }
 

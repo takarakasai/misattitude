@@ -18,4 +18,17 @@
  *              same vertex_color material as the other shapes. Four legs, head
  *              and tail give the strongest directional cues of any shape here.
  */
-enum class BodyShape { Cube, Capsule, Teapot, Spot }
+enum class BodyShape {
+    Cube, Capsule, Teapot, Spot;
+
+    /**
+     * True iff this shape is selectable without the Pro upgrade. Cube and
+     * Capsule are basic procedural primitives included in the free version;
+     * Teapot (compound primitive, graphics-history mascot) and Spot (real
+     * gltf-loaded mesh) are positioned as "premium content" behind Pro.
+     *
+     * The free version still shows Teapot/Spot chips in the picker — greyed
+     * with a 🔒 badge — so users see what they unlock by upgrading.
+     */
+    val isFree: Boolean get() = this == Cube || this == Capsule
+}

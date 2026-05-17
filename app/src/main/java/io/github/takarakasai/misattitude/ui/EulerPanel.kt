@@ -219,12 +219,20 @@ private fun AngleSlider(
 }
 
 /** Order picker: dropdown listing 6 Tait-Bryan + 6 Proper Euler orders.
- *  Public so the SettingsBottomSheet can reuse it. */
+ *  Public so the SettingsBottomSheet can reuse it.
+ *
+ *  Free-tier behaviour:
+ *  Items not in [EulerConvention.FREE_CONVENTIONS] are still rendered, but
+ *  marked with a 🔒 prefix and rerouted through [onLockedClick] (Pro upgrade
+ *  flow) instead of selecting the convention. We do this rather than hide
+ *  them so users can see what they unlock by upgrading. */
 @Composable
 fun ConventionPicker(
     convention: EulerConvention,
     onChange: (EulerConvention) -> Unit,
     modifier: Modifier = Modifier,
+    proActive: Boolean = true,
+    onLockedClick: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     val current = AxisOrder(convention.axis1, convention.axis2, convention.axis3, convention.isProperEuler)
@@ -242,12 +250,13 @@ fun ConventionPicker(
             style = MaterialTheme.typography.labelMedium,
         )
         for (order in taitBryanOrders) {
-            DropdownMenuItem(
-                text = { Text(order.label) },
-                onClick = {
-                    onChange(EulerConvention(order.a1, order.a2, order.a3, convention.frame))
-                    expanded = false
-                },
+            DropdownEntry(
+                order = order,
+                frame = convention.frame,
+                proActive = proActive,
+                onChange = onChange,
+                onLockedClick = onLockedClick,
+                onDismiss = { expanded = false },
             )
         }
         Text(
@@ -259,15 +268,56 @@ fun ConventionPicker(
             style = MaterialTheme.typography.labelMedium,
         )
         for (order in properEulerOrders) {
-            DropdownMenuItem(
-                text = { Text(order.label) },
-                onClick = {
-                    onChange(EulerConvention(order.a1, order.a2, order.a3, convention.frame))
-                    expanded = false
-                },
+            DropdownEntry(
+                order = order,
+                frame = convention.frame,
+                proActive = proActive,
+                onChange = onChange,
+                onLockedClick = onLockedClick,
+                onDismiss = { expanded = false },
             )
         }
     }
+}
+
+/**
+ * One dropdown row inside [ConventionPicker]. We pre-build the convention
+ * implied by `(order, frame)` here so the free/Pro decision is local: a free
+ * user tapping a Pro-only entry gets [onLockedClick] (which typically jumps
+ * to the purchase flow), while a Pro user — or a free user tapping a free
+ * entry — gets the normal [onChange].
+ */
+@Composable
+private fun DropdownEntry(
+    order: AxisOrder,
+    frame: FrameKind,
+    proActive: Boolean,
+    onChange: (EulerConvention) -> Unit,
+    onLockedClick: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val candidate = EulerConvention(order.a1, order.a2, order.a3, frame)
+    val locked = !proActive && !candidate.isFree
+    DropdownMenuItem(
+        text = {
+            Text(
+                text = if (locked) "🔒  ${order.label}" else order.label,
+                color = if (locked) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    Color.Unspecified
+                },
+            )
+        },
+        onClick = {
+            if (locked) {
+                onLockedClick()
+            } else {
+                onChange(candidate)
+            }
+            onDismiss()
+        },
+    )
 }
 
 /** Intrinsic/Extrinsic toggle. Public so the SettingsBottomSheet can reuse it. */

@@ -128,8 +128,21 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
             }
 
             // ─── Tabbed control panels ───
+            //
+            // Tabs marked with 🔒 indicate Pro-gated content: Quaternion is
+            // partially gated (readable but not editable), Playback is fully
+            // gated (replaced with an upgrade wall). Free users can still tap
+            // these tabs — they navigate to the explanation/wall — which is
+            // important so users discover what Pro unlocks rather than wondering
+            // why a tab is missing.
             var tab by remember { mutableIntStateOf(0) }
-            val tabs = listOf("Euler", "Quaternion", "Matrix", "Playback")
+            val tabs = remember(state.proActive) {
+                if (state.proActive) {
+                    listOf("Euler", "Quaternion", "Matrix", "Playback")
+                } else {
+                    listOf("Euler", "🔒 Quaternion", "Matrix", "🔒 Playback")
+                }
+            }
             TabRow(selectedTabIndex = tab) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
@@ -140,6 +153,7 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                 }
             }
 
+            val onBuyPro = { activity?.let(viewModel::launchProPurchase); Unit }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -155,6 +169,8 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                     1 -> QuaternionPanel(
                         canonical = state.canonical,
                         onQuaternionChange = viewModel::setQuaternion,
+                        editable = state.proActive,
+                        onBuyPro = onBuyPro,
                     )
                     2 -> MatrixPanel(
                         canonical = state.canonical,
@@ -170,6 +186,8 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                         onReset = viewModel::resetPlayback,
                         onToggleSteps = viewModel::toggleSteps,
                         onToggleComparison = viewModel::toggleComparison,
+                        proActive = state.proActive,
+                        onBuyPro = onBuyPro,
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -380,42 +398,67 @@ private fun SettingsBottomSheet(
             HorizontalDivider()
 
             // ── Body shape ──
+            // Pro-only chips (Teapot, Spot) are visually distinguished with a
+            // 🔒 prefix and reroute taps to the purchase flow instead of
+            // changing the shape. Showing them rather than hiding them is a
+            // deliberate conversion lever: free users see the cute Spot cow
+            // exists and is one upgrade away.
             Text(
                 "Body shape",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
             SettingRow(label = "Body") {
-                FilterChip(
+                BodyShapeChip(
+                    shape = BodyShape.Cube,
                     selected = state.bodyShape == BodyShape.Cube,
-                    onClick = { onBodyShapeChange(BodyShape.Cube) },
-                    label = { Text("Cube") },
+                    proActive = state.proActive,
+                    onSelect = onBodyShapeChange,
+                    onLockedClick = onBuyPro,
                 )
-                FilterChip(
+                BodyShapeChip(
+                    shape = BodyShape.Capsule,
                     selected = state.bodyShape == BodyShape.Capsule,
-                    onClick = { onBodyShapeChange(BodyShape.Capsule) },
-                    label = { Text("Capsule") },
+                    proActive = state.proActive,
+                    onSelect = onBodyShapeChange,
+                    onLockedClick = onBuyPro,
                 )
-                FilterChip(
+                BodyShapeChip(
+                    shape = BodyShape.Teapot,
                     selected = state.bodyShape == BodyShape.Teapot,
-                    onClick = { onBodyShapeChange(BodyShape.Teapot) },
-                    label = { Text("Teapot") },
+                    proActive = state.proActive,
+                    onSelect = onBodyShapeChange,
+                    onLockedClick = onBuyPro,
                 )
-                FilterChip(
+                BodyShapeChip(
+                    shape = BodyShape.Spot,
                     selected = state.bodyShape == BodyShape.Spot,
-                    onClick = { onBodyShapeChange(BodyShape.Spot) },
-                    label = { Text("Spot") },
+                    proActive = state.proActive,
+                    onSelect = onBodyShapeChange,
+                    onLockedClick = onBuyPro,
                 )
             }
 
             HorizontalDivider()
 
             // ── Euler convention ──
+            // Free tier exposes 4 of the 12 conventions (ZYX intr/extr,
+            // ZYZ intr, XYZ intr — see EulerConvention.FREE_CONVENTIONS).
+            // Pro-only entries appear in the dropdown with a 🔒 prefix; tapping
+            // them launches the purchase flow.
             Text(
                 "Euler convention",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
+            if (!state.proActive) {
+                Text(
+                    text = "Free includes 4 conventions (ZYX intr/extr, ZYZ intr, XYZ intr). " +
+                        "Unlock all 12 with Pro.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -424,10 +467,21 @@ private fun SettingsBottomSheet(
                     convention = state.convention,
                     onChange = onConventionChange,
                     modifier = Modifier.weight(1f),
+                    proActive = state.proActive,
+                    onLockedClick = onBuyPro,
                 )
                 FrameSwitch(
                     convention = state.convention,
-                    onChange = onConventionChange,
+                    onChange = { candidate ->
+                        // Free users can only toggle between Intrinsic and
+                        // Extrinsic if the new combination is in FREE_CONVENTIONS.
+                        // Otherwise route to the upgrade flow.
+                        if (candidate.isFree || state.proActive) {
+                            onConventionChange(candidate)
+                        } else {
+                            onBuyPro()
+                        }
+                    },
                 )
             }
 
@@ -627,6 +681,36 @@ private fun RemoveAdsCta(
             )
         }
     }
+}
+
+/**
+ * A FilterChip for one [BodyShape] that respects Pro entitlement.
+ *
+ *   * Pro-only shapes (Teapot, Spot) on the free tier show a 🔒 prefix and
+ *     route taps to [onLockedClick] (Pro purchase flow) instead of selecting
+ *     the shape. The chip's `selected` state can never be true for a locked
+ *     shape because the ViewModel refuses to switch to one (defensive guard
+ *     in `setBodyShape`), so the visual stays in a consistent "available but
+ *     locked" state.
+ *   * Free shapes (Cube, Capsule) behave exactly like the previous
+ *     unconditional FilterChips.
+ */
+@Composable
+private fun BodyShapeChip(
+    shape: BodyShape,
+    selected: Boolean,
+    proActive: Boolean,
+    onSelect: (BodyShape) -> Unit,
+    onLockedClick: () -> Unit,
+) {
+    val locked = !proActive && !shape.isFree
+    FilterChip(
+        selected = selected,
+        onClick = { if (locked) onLockedClick() else onSelect(shape) },
+        label = {
+            Text(if (locked) "🔒 ${shape.name}" else shape.name)
+        },
+    )
 }
 
 /** Common row layout used inside the bottom sheet: a fixed-width left label and a
