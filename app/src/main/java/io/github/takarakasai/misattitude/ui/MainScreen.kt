@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.takarakasai.misattitude.BuildConfig
 import io.github.takarakasai.misattitude.domain.BodyShape
+import io.github.takarakasai.misattitude.ui.ads.AdBanner
 import io.github.takarakasai.misattitude.domain.EulerConvention
 import io.github.takarakasai.misattitude.domain.FrameKind
 import io.github.takarakasai.misattitude.domain.Handedness
@@ -135,7 +136,8 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
 
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
             ) {
                 when (tab) {
@@ -165,6 +167,16 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // AdMob banner — pinned to the bottom of the Column, above the
+            // system nav bar. Hidden entirely when the user owns the Pro
+            // upgrade: the Composable simply isn't emitted, AdBanner's
+            // DisposableEffect tears down the AdView, and the row collapses
+            // to zero height (the panel above takes the freed space via its
+            // weight(1f) modifier).
+            if (!state.proActive) {
+                AdBanner(modifier = Modifier.fillMaxWidth())
             }
         }
 

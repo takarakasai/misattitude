@@ -1,5 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        INTERNET / ACCESS_NETWORK_STATE are pulled in by the Google Mobile Ads
+        SDK manifest merge as well; we declare them explicitly here so a casual
+        reader of THIS file sees the full permission story without needing to
+        look at merged-manifest output. These are the ONLY outbound-network
+        permissions in the app — they exist solely for AdMob.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"
@@ -20,5 +30,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            AdMob "app ID". Required by the Google Mobile Ads SDK regardless
+            of whether ads are currently loaded; without it the SDK crashes
+            at initialise time.
+              * This value is Google's reserved SAMPLE id — safe for
+                development and test ads only. Replace with the real id
+                (format "ca-app-pub-NNNN~NNNN") once the AdMob account is
+                registered and an app is created there.
+              * The actual ad-unit ids (per-banner / per-interstitial) are
+                injected from code, not declared here.
+        -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
     </application>
 </manifest>

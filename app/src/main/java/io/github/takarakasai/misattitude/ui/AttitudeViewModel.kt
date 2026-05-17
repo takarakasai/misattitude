@@ -46,6 +46,14 @@ class AttitudeViewModel : ViewModel() {
         val playbackSpeed: Double = 0.4,
         val showSteps: Boolean = false,
         val showComparison: Boolean = false,
+        /**
+         * Whether the user has purchased the "Remove ads" Pro upgrade. When
+         * true, [MainScreen] hides the AdMob banner entirely (no network
+         * requests, the AdView is disposed). Wired to actual purchase state
+         * by the Play Billing integration in a follow-up change; for now it
+         * stays false so the banner is always shown in test builds.
+         */
+        val proActive: Boolean = false,
     )
 
     private val _state = MutableStateFlow(UiState())

@@ -1,12 +1,13 @@
-﻿package io.github.takarakasai.misattitude
+package io.github.takarakasai.misattitude
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.google.android.filament.utils.Utils
+import com.google.android.gms.ads.MobileAds
 import io.github.takarakasai.misattitude.ui.MainScreen
 import io.github.takarakasai.misattitude.ui.theme.MisattitudeTheme
-import com.google.android.filament.utils.Utils
 
 class MainActivity : ComponentActivity() {
 
@@ -23,6 +24,17 @@ class MainActivity : ComponentActivity() {
         // 実コンテンツへのインセット適用は MainScreen 側で systemBarsPadding() を使う。
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // Google Mobile Ads SDK initialisation.
+        //
+        // Why here in MainActivity.onCreate rather than a custom Application
+        // subclass: the SDK supports lazy init from any Context as long as it
+        // runs before the first AdView load. Doing it here avoids adding an
+        // Application class to the manifest for one line of code, and keeps
+        // "all third-party SDK init" visible in one place. The callback is
+        // intentionally a no-op — we have no mediation adapters to inspect.
+        MobileAds.initialize(this) { /* init complete */ }
+
         setContent {
             MisattitudeTheme {
                 MainScreen()

@@ -103,6 +103,12 @@ dependencies {
     implementation(libs.filament.android)
     implementation(libs.filament.utils.android)
 
+    // Google Mobile Ads SDK — AdMob banner under the 3D canvas in the free
+    // version. Hidden when the Pro IAP is owned. Brings in play-services-base
+    // and adds INTERNET / ACCESS_NETWORK_STATE via its manifest merge — the
+    // only outbound network in the entire app.
+    implementation(libs.play.services.ads)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
