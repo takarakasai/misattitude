@@ -148,7 +148,10 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                         canonical = state.canonical,
                         onQuaternionChange = viewModel::setQuaternion,
                     )
-                    2 -> MatrixPanel(canonical = state.canonical)
+                    2 -> MatrixPanel(
+                        canonical = state.canonical,
+                        onMatrixChange = viewModel::setMatrix,
+                    )
                     3 -> PlaybackPanel(
                         state = state,
                         onCaptureStart = viewModel::captureStart,
