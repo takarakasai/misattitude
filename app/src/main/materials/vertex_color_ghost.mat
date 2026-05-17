@@ -1,0 +1,40 @@
+// Ghost / "X-ray" material used by the comparison overlay.
+//
+// Why "add" instead of "transparent"?
+//   The default `transparent` (premultiplied alpha) blend mode mathematically
+//   does see-through compositing, but against a dark background it just
+//   produces "darker color" rather than the perception of looking through
+//   something. With `add` the ghost's per-vertex RGB (multiplied by its
+//   alpha) is *added* to whatever is already in the framebuffer:
+//
+//     out = dst + src.rgb * src.a
+//
+//   Two consequences:
+//     1. The ghost can never DARKEN anything behind it. World axes, the
+//        active body's body axes, and the active body itself all retain
+//        their original colour wherever they overlap the ghost — so the
+//        ghost never reads as "occluding" — and that is what makes it feel
+//        translucent rather than just paler.
+//     2. The ghost itself glows softly against the dark background; the
+//        Spot / Teapot silhouette is still readable but its bright surfaces
+//        carry the cue and dark surfaces (e.g. Spot's black spots) just
+//        vanish — emphasising "this is a hint, not a body" perceptually.
+//
+// Tuning: with `add`, alpha acts purely as a brightness scale (0 = invisible,
+// 1 = full luminance). 0.45–0.55 reads as "clearly visible glow without
+// stealing focus from the active body".
+material {
+    name : vertexColorGhost,
+    shadingModel : unlit,
+    blending : add,
+    requires : [ position, color ],
+    doubleSided : true,
+    parameters : []
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        material.baseColor = getColor();
+    }
+}

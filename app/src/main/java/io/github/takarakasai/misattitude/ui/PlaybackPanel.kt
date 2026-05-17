@@ -105,7 +105,7 @@ fun PlaybackPanel(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(checked = state.showComparison, onCheckedChange = { onToggleComparison() })
-            Text("  Comparison ghost (other interpolation as wireframe)",
+            Text("  Comparison ghost (other interpolation as translucent body)",
                 style = MaterialTheme.typography.bodyMedium)
         }
     }

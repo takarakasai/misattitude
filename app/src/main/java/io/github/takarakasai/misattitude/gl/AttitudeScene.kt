@@ -46,8 +46,12 @@ class AttitudeScene(context: Context) {
 
     private val opaqueMaterial: Material = loadMaterial(context, "vertex_color_opaque")
     private val transparentMaterial: Material = loadMaterial(context, "vertex_color")
+    // Ghost-only material: additive blending so the comparison overlay reads
+    // as "see-through glow" rather than "lighter shade of the same colour".
+    // See app/src/main/materials/vertex_color_ghost.mat for the rationale.
+    private val ghostMaterial: Material = loadMaterial(context, "vertex_color_ghost")
     private val opaqueInstance: MaterialInstance = opaqueMaterial.createInstance()
-    private val ghostInstance: MaterialInstance = transparentMaterial.createInstance()
+    private val ghostInstance: MaterialInstance = ghostMaterial.createInstance()
     private val stepInstance: MaterialInstance = transparentMaterial.createInstance()
     private val labelInstance: MaterialInstance = transparentMaterial.createInstance()
     // Cube body uses a separate transparent instance (alpha 0.30) so the origin
@@ -155,11 +159,29 @@ class AttitudeScene(context: Context) {
         colors = bodyAxisColors, alpha = 0.40f,
     )
 
-    // Ghost wireframe used for the Slerp-vs-EulerLERP comparison.
-    private val ghostCube = Meshes.buildCubeWireframe(
-        engine, ghostInstance, size = 0.55f,
-        r = 0.92f, g = 0.92f, b = 0.95f, alpha = 0.55f,
-    )
+    // Ghost variants of each body shape — additive-blended meshes for the
+    // Slerp-vs-EulerLERP comparison. With the additive ghost material, alpha
+    // is a luminance scale rather than an opacity (the ghost can never darken
+    // the framebuffer, only add light). 0.45 reads as a clear "glow" against
+    // the dark background while still letting the world axes / body axes
+    // pass through unattenuated. (Spot loads its asset twice — once for the
+    // active body, once here for the ghost. ~50-100ms one-time cost; runs once.)
+    private val ghostCube = Meshes.buildColoredCube(engine, ghostInstance, size = 0.55f, alpha = 0.45f)
+    private val ghostCapsule = Meshes.buildCapsule(engine, ghostInstance, alpha = 0.45f)
+    private val ghostTeapot = Meshes.buildTeapot(engine, ghostInstance, scale = 1.0f, alpha = 0.45f)
+    private val ghostSpot = Meshes.buildSpot(engine, ghostInstance, context.assets, scale = 1.0f, alpha = 0.45f)
+
+    private fun ghostMeshFor(shape: BodyShape): Mesh = when (shape) {
+        BodyShape.Cube -> ghostCube
+        BodyShape.Capsule -> ghostCapsule
+        BodyShape.Teapot -> ghostTeapot
+        BodyShape.Spot -> ghostSpot
+    }
+
+    /** Which ghost mesh is currently in the scene, or null if ghost is hidden.
+     *  Lets setGhostAttitude detect "user changed body shape while ghost was on"
+     *  and swap meshes lazily without needing setBodyShape to know about ghosts. */
+    private var ghostInScene: BodyShape? = null
 
     // Axis-tip labels. Body labels use the body axis colors (saturated for readability);
     // world labels use a uniform soft white so they read as "reference" markers.
@@ -175,7 +197,6 @@ class AttitudeScene(context: Context) {
     )
 
     private var stepsVisible = false
-    private var ghostVisible = false
 
     init {
         view.scene = scene
@@ -403,16 +424,33 @@ class AttitudeScene(context: Context) {
         }
     }
 
-    /** Show or hide the ghost wireframe. Pass null to hide. */
+    /**
+     * Show or hide the ghost. Pass `null` to hide. The ghost mesh used is whichever
+     * ghost variant matches the **currently-selected body shape**, so the user
+     * compares "live trajectory" vs "alternate trajectory" with the same silhouette
+     * (e.g. Spot vs translucent Spot). If the user changes body shape while the
+     * ghost is visible, this function — called every frame from MainScreen's update
+     * lambda — detects the mismatch and swaps the in-scene mesh accordingly.
+     *
+     * The ghost transform applies the same `bodyShapeOffset()` as the active body
+     * mesh so a Y-up-designed model (Capsule / Teapot / Spot) stands upright in a
+     * Z-up world for both copies.
+     */
     fun setGhostAttitude(q: Quaternion?) {
-        val want = q != null
-        if (want != ghostVisible) {
-            if (want) scene.addEntity(ghostCube.entity) else scene.removeEntity(ghostCube.entity)
-            ghostVisible = want
+        if (q == null) {
+            // Hide.
+            ghostInScene?.let { scene.removeEntity(ghostMeshFor(it).entity) }
+            ghostInScene = null
+            return
         }
-        if (q != null) {
-            applyTransform(ghostCube.entity, quaternionToColumnMajor4x4(q))
+        // Make sure the right ghost mesh is in the scene (swap if body shape changed).
+        if (ghostInScene != currentBody) {
+            ghostInScene?.let { scene.removeEntity(ghostMeshFor(it).entity) }
+            scene.addEntity(ghostMeshFor(currentBody).entity)
+            ghostInScene = currentBody
         }
+        val mesh = ghostMeshFor(currentBody)
+        applyTransform(mesh.entity, quaternionToColumnMajor4x4(q * bodyShapeOffset()))
     }
 
     private fun applyTransform(entity: Int, xform: FloatArray) {
@@ -513,7 +551,8 @@ class AttitudeScene(context: Context) {
         scene.skybox?.let { engine.destroySkybox(it) }
         val all = mutableListOf(
             worldAxes, bodyCube, bodyCapsule, bodyTeapot, bodySpot,
-            bodyAxes, step1Axes, step2Axes, ghostCube,
+            bodyAxes, step1Axes, step2Axes,
+            ghostCube, ghostCapsule, ghostTeapot, ghostSpot,
         )
         all.addAll(bodyLabels)
         all.addAll(worldLabels)
@@ -525,6 +564,7 @@ class AttitudeScene(context: Context) {
         engine.destroyMaterialInstance(cubeInstance)
         engine.destroyMaterial(opaqueMaterial)
         engine.destroyMaterial(transparentMaterial)
+        engine.destroyMaterial(ghostMaterial)
         engine.destroyCameraComponent(cameraEntity)
         EntityManager.get().destroy(cameraEntity)
         engine.destroyView(view)
