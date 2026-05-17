@@ -6,8 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.google.android.filament.utils.Utils
 import com.google.android.gms.ads.MobileAds
+import io.github.takarakasai.misattitude.ads.ConsentManager
 import io.github.takarakasai.misattitude.ui.MainScreen
 import io.github.takarakasai.misattitude.ui.theme.MisattitudeTheme
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity() {
 
@@ -16,6 +18,12 @@ class MainActivity : ComponentActivity() {
             // Loads the Filament native libraries. Must run before any Filament call.
             Utils.init()
         }
+
+        // Process-scoped flag: AdMob SDK must be initialised exactly once per
+        // process. ConsentManager fires its callback synchronously when no form
+        // is needed and asynchronously after the user dismisses one — using a
+        // simple AtomicBoolean handles both paths safely.
+        private val mobileAdsInitialised = AtomicBoolean(false)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,15 +33,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Google Mobile Ads SDK initialisation.
+        // Consent → MobileAds.initialize → first ad request.
         //
-        // Why here in MainActivity.onCreate rather than a custom Application
-        // subclass: the SDK supports lazy init from any Context as long as it
-        // runs before the first AdView load. Doing it here avoids adding an
-        // Application class to the manifest for one line of code, and keeps
-        // "all third-party SDK init" visible in one place. The callback is
-        // intentionally a no-op — we have no mediation adapters to inspect.
-        MobileAds.initialize(this) { /* init complete */ }
+        // We gate MobileAds.initialize behind ConsentManager so that the
+        // SDK's first network request happens with the user's consent state
+        // already known. This is what AdMob's documentation recommends and
+        // what is now policy-required for EU/EEA/UK users; outside those
+        // regions UMP no-ops and the callback fires immediately.
+        ConsentManager.requestConsentIfNeeded(this) {
+            if (mobileAdsInitialised.compareAndSet(false, true)) {
+                MobileAds.initialize(this) { /* init complete */ }
+            }
+        }
 
         setContent {
             MisattitudeTheme {
