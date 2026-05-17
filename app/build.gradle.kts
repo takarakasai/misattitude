@@ -17,7 +17,7 @@ android {
         applicationId = "io.github.takarakasai.misattitude"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
+        versionCode = 6
         versionName = "1.0"
     }
 
@@ -108,6 +108,12 @@ dependencies {
     // and adds INTERNET / ACCESS_NETWORK_STATE via its manifest merge — the
     // only outbound network in the entire app.
     implementation(libs.play.services.ads)
+
+    // User Messaging Platform — Google's official GDPR / EU consent dialog
+    // SDK. Required by AdMob policy whenever ads may be served to EU/EEA/UK
+    // users; without it, fill rate in those regions collapses. The SDK is
+    // smart enough to no-op outside affected regions, so we always call it.
+    implementation(libs.user.messaging.platform)
 
     // Google Play Billing Library — one non-consumable IAP ("Pro upgrade")
     // that disables the AdMob banner. The -ktx variant adds coroutine-friendly
