@@ -229,12 +229,29 @@ class BillingRepository(context: Context) {
     }
 
     private fun updateEntitlement(pro: Boolean) {
-        _proPurchased.value = pro
-        prefs.edit().putBoolean(KEY_PRO, pro).apply()
+        // Debug-only override for screenshotting / QA-ing the free-tier UI on
+        // a tester device that legitimately owns the Pro SKU. The override
+        // *only* takes effect when DEBUG_FORCE_FREE is true AND the build is
+        // a debug build, so it can't accidentally ship.
+        val effective = if (DEBUG_FORCE_FREE && io.github.takarakasai.misattitude.BuildConfig.DEBUG) {
+            false
+        } else {
+            pro
+        }
+        _proPurchased.value = effective
+        prefs.edit().putBoolean(KEY_PRO, effective).apply()
     }
 
     companion object {
         private const val TAG = "BillingRepository"
+
+        /**
+         * Set to `true` ONLY when you need to see the free-tier UI on a device
+         * that owns the Pro SKU (e.g. screenshotting the Pro-gated screens
+         * during QA). Has no effect outside debug builds. **Must be false in
+         * any release build**, including internal-testing AABs.
+         */
+        private const val DEBUG_FORCE_FREE = false
 
         /** Must match the product ID configured in Play Console → Monetisation
          *  → Products → "Managed in-app products". Choose **non-consumable**
