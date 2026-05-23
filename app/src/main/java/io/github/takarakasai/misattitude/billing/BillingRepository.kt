@@ -131,6 +131,14 @@ class BillingRepository(context: Context) {
      *  delivered asynchronously through [proPurchased]. No-op if the product
      *  details haven't loaded yet (BillingClient still connecting). */
     fun launchPurchaseFlow(activity: Activity) {
+        // QA mode short-circuit: the device's Google account legitimately owns
+        // the SKU but we're forcing the Free UI for screenshotting. Letting
+        // the real Play sheet open would just yield ITEM_ALREADY_OWNED, which
+        // looks like a bug to the QA tester. Instead, no-op with a log.
+        if (DEBUG_FORCE_FREE && io.github.takarakasai.misattitude.BuildConfig.DEBUG) {
+            Log.i(TAG, "DEBUG_FORCE_FREE active — suppressing real purchase flow")
+            return
+        }
         val details = proProductDetails
         if (details == null) {
             Log.w(TAG, "Pro product details not yet loaded; ignoring purchase request")
