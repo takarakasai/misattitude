@@ -76,6 +76,15 @@ class BillingRepository(context: Context) {
                 // Expected; nothing to do beyond logging.
                 Log.d(TAG, "Purchase cancelled by user")
             }
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
+                // Race condition: the local UI offered the purchase (e.g. the
+                // entitlement query hadn't completed yet, or SharedPreferences
+                // was stale) but Google's records show the user already owns
+                // the SKU. Resync from Google so the UI snaps to Pro state
+                // without making the user retry / contact support.
+                Log.i(TAG, "ITEM_ALREADY_OWNED — resyncing entitlement from Google")
+                scope.launch { refreshPurchases() }
+            }
             else -> {
                 Log.w(TAG, "Purchase flow error: ${result.responseCode} ${result.debugMessage}")
             }
@@ -229,17 +238,16 @@ class BillingRepository(context: Context) {
     }
 
     private fun updateEntitlement(pro: Boolean) {
-        // Debug-only override for screenshotting / QA-ing the free-tier UI on
-        // a tester device that legitimately owns the Pro SKU. The override
-        // *only* takes effect when DEBUG_FORCE_FREE is true AND the build is
-        // a debug build, so it can't accidentally ship.
+        // Always persist the *real* entitlement to prefs so DEBUG_FORCE_FREE
+        // can be flipped on/off without poisoning the cache. The override
+        // only affects the observable StateFlow.
+        prefs.edit().putBoolean(KEY_PRO, pro).apply()
         val effective = if (DEBUG_FORCE_FREE && io.github.takarakasai.misattitude.BuildConfig.DEBUG) {
             false
         } else {
             pro
         }
         _proPurchased.value = effective
-        prefs.edit().putBoolean(KEY_PRO, effective).apply()
     }
 
     companion object {
