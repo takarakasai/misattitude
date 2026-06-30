@@ -16,6 +16,7 @@ import io.github.takarakasai.misattitude.domain.UpAxis
 import io.github.takarakasai.misattitude.domain.WorldConvention
 import io.github.takarakasai.misattitude.domain.approxEquals
 import io.github.takarakasai.misattitude.domain.isFinite
+import io.github.takarakasai.misattitude.sensor.DeviceAttitudeSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,10 +67,35 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
          * stays false so the banner is always shown in test builds.
          */
         val proActive: Boolean = false,
+        /**
+         * Whether "Live (sensor)" mode is active. While true, [canonical] is
+         * driven continuously by the device's rotation-vector sensor (see
+         * [DeviceAttitudeSource]) and the manual attitude editors are inert —
+         * the body mirrors how the user physically tilts the phone, relative to
+         * the last re-center. A Pro-gated feature.
+         */
+        val sensorActive: Boolean = false,
     )
 
     private val _state = MutableStateFlow(UiState(proActive = billing.proPurchased.value))
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    // Device-orientation source for "Live (sensor)" mode. Constructed eagerly
+    // (cheap — just resolves the SensorManager and the default sensor) but does
+    // not register a listener until setSensorActive(true). Its callback fires on
+    // the main thread, so updating the StateFlow here is Compose-safe.
+    private val deviceAttitude = DeviceAttitudeSource(application) { q ->
+        // Only honour samples while live mode is on. start()/stop() bracket this,
+        // but a final in-flight event can arrive just after stop(); the guard
+        // makes that a harmless no-op.
+        if (_state.value.sensorActive) {
+            _state.update { it.copy(canonical = q) }
+        }
+    }
+
+    /** Whether this device has a usable rotation-vector sensor. Constant for the
+     *  process lifetime, so it's fine to read directly from composition. */
+    val sensorAvailable: Boolean get() = deviceAttitude.isAvailable
 
     init {
         // Mirror entitlement changes from BillingRepository into UiState so
@@ -82,10 +108,14 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
         // UI doesn't keep editing locked content under a free user.
         viewModelScope.launch {
             billing.proPurchased.collect { pro ->
+                // Live (sensor) mode is Pro-gated; tear down the listener if the
+                // entitlement is lost so a downgraded user can't keep streaming.
+                if (!pro) deviceAttitude.stop()
                 _state.update { s ->
                     val nextShape = if (!pro && !s.bodyShape.isFree) BodyShape.Cube else s.bodyShape
                     val nextConv = if (!pro && !s.convention.isFree) EulerConvention.DEFAULT else s.convention
-                    s.copy(proActive = pro, bodyShape = nextShape, convention = nextConv)
+                    val nextSensor = if (!pro) false else s.sensorActive
+                    s.copy(proActive = pro, bodyShape = nextShape, convention = nextConv, sensorActive = nextSensor)
                 }
             }
         }
@@ -105,19 +135,62 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
      *  empty briefly at app start before ProductDetails has loaded. */
     val proPriceFormatted: String get() = billing.proPriceFormatted
 
+    // ─── Live (sensor) mode ─────────────────────────────────────────────────
+
+    /**
+     * Turn "Live (sensor)" mode on or off. Pro-gated: the UI routes free users
+     * to the purchase flow, but we also refuse here so no path enables it for
+     * free. Enabling re-centers (so the current pose becomes identity) and
+     * stops any running playback so the two don't fight over [UiState.canonical].
+     */
+    fun setSensorActive(active: Boolean) {
+        if (active) {
+            if (!_state.value.proActive || !deviceAttitude.isAvailable) return
+            deviceAttitude.recenter()
+            deviceAttitude.start()
+            _state.update { it.copy(sensorActive = true, isPlaying = false) }
+        } else {
+            deviceAttitude.stop()
+            _state.update { it.copy(sensorActive = false) }
+        }
+    }
+
+    /** Re-zero live mode: the phone's current pose becomes the identity attitude. */
+    fun recenterSensor() = deviceAttitude.recenter()
+
+    /** Drop the sensor registration to save battery while backgrounded, without
+     *  clearing the user's "live mode" intent. Call from the UI on ON_PAUSE. */
+    fun pauseSensor() = deviceAttitude.stop()
+
+    /** Re-register the sensor on return to the foreground, but only if live mode
+     *  is still on. Call from the UI on ON_RESUME. */
+    fun resumeSensor() {
+        if (_state.value.sensorActive) deviceAttitude.start()
+    }
+
+    override fun onCleared() {
+        deviceAttitude.stop()
+        super.onCleared()
+    }
+
     // --- direct attitude edits ---
 
     fun setEuler(angles: EulerAngles) {
+        // Live (sensor) mode owns `canonical`; ignore manual edits so a stray
+        // slider drag doesn't fight the ~50 Hz sensor stream.
+        if (_state.value.sensorActive) return
         val q = Conversions.eulerToQuaternion(angles, _state.value.convention).canonical()
         _state.update { it.copy(canonical = q) }
     }
 
     fun setQuaternion(q: Quaternion) {
+        if (_state.value.sensorActive) return
         if (!q.isFinite() || q.norm() < 1e-9) return
         _state.update { it.copy(canonical = q.normalized().canonical()) }
     }
 
     fun setMatrix(m: RotationMatrix) {
+        if (_state.value.sensorActive) return
         val q = Conversions.matrixToQuaternion(m.orthonormalized()).canonical()
         _state.update { it.copy(canonical = q) }
     }
@@ -155,6 +228,9 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun resetToIdentity() {
+        // In live mode the sensor equivalent of "reset" is "re-center", which is
+        // a separate control; leave `canonical` to the sensor here.
+        if (_state.value.sensorActive) return
         _state.update { it.copy(canonical = Quaternion.IDENTITY) }
     }
 
@@ -167,6 +243,7 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
     fun setPlaybackMode(m: PlaybackMode) = _state.update { it.copy(playbackMode = m) }
 
     fun setPlaybackT(t: Double) {
+        if (_state.value.sensorActive) return
         _state.update { s ->
             val tt = t.coerceIn(0.0, 1.0)
             s.copy(playbackT = tt, canonical = trajectory(s, tt))
@@ -174,6 +251,7 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun togglePlaying() {
+        if (_state.value.sensorActive) return
         _state.update { s ->
             val resumeFromStart = s.playbackT >= 1.0
             val newT = if (resumeFromStart) 0.0 else s.playbackT
@@ -186,6 +264,7 @@ class AttitudeViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun resetPlayback() {
+        if (_state.value.sensorActive) return
         _state.update { it.copy(playbackT = 0.0, isPlaying = false, canonical = trajectory(it, 0.0)) }
     }
 

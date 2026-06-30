@@ -6,6 +6,7 @@ import io.github.takarakasai.misattitude.domain.Handedness
 import io.github.takarakasai.misattitude.domain.Quaternion
 import io.github.takarakasai.misattitude.domain.UpAxis
 import io.github.takarakasai.misattitude.domain.WorldConvention
+import io.github.takarakasai.misattitude.domain.approxEquals
 import com.google.android.filament.Camera
 import com.google.android.filament.Engine
 import com.google.android.filament.EntityManager
@@ -80,6 +81,20 @@ class AttitudeScene(context: Context) {
     private var currentConvention: WorldConvention = WorldConvention.GraphicsDefault
     /** Latest body attitude — kept so label transforms can be refreshed when the convention changes. */
     private var lastBodyAttitude: Quaternion = Quaternion.IDENTITY
+
+    /**
+     * Extra rotation applied to the *camera* (eye + up) on top of [cameraPos] /
+     * [worldUp]. Identity in the default "frame fixed, body rotates" view. In the
+     * "object locked to device" view it's set to the body attitude each frame so
+     * the camera co-rotates with the body — the body then appears fixed on screen
+     * while the world frame rotates around it. The body's attitude data and all
+     * numeric read-outs are unchanged; only the vantage differs.
+     */
+    private var viewRotation: Quaternion = Quaternion.IDENTITY
+    // Effective eye/up after applying viewRotation. Recomputed every pushCamera()
+    // and used for label billboarding so labels keep facing the real camera.
+    private val effectiveEye = floatArrayOf(2.4f, 1.9f, 2.6f)
+    private val effectiveUp = floatArrayOf(0f, 1f, 0f)
 
     // Geometry lengths — the labels need to be placed slightly beyond each tip.
     private val bodyAxisLength = 1.05f
@@ -226,12 +241,18 @@ class AttitudeScene(context: Context) {
      * any view-dependent geometry (label billboards). Call after any camera edit.
      */
     private fun pushCamera() {
+        // Apply the optional camera co-rotation (object-locked-to-device view).
+        // In the default view viewRotation is identity, so eye/up == base.
+        val eye = rotateVecByQuat(cameraPos, viewRotation)
+        val up = rotateVecByQuat(worldUp, viewRotation)
+        effectiveEye[0] = eye[0]; effectiveEye[1] = eye[1]; effectiveEye[2] = eye[2]
+        effectiveUp[0] = up[0]; effectiveUp[1] = up[1]; effectiveUp[2] = up[2]
         camera.lookAt(
-            cameraPos[0].toDouble(), cameraPos[1].toDouble(), cameraPos[2].toDouble(),
+            eye[0].toDouble(), eye[1].toDouble(), eye[2].toDouble(),
             0.0, 0.0, 0.0,
-            worldUp[0].toDouble(), worldUp[1].toDouble(), worldUp[2].toDouble(),
+            up[0].toDouble(), up[1].toDouble(), up[2].toDouble(),
         )
-        // Labels billboard against camera position, so they need re-orienting.
+        // Labels billboard against the (effective) camera position, so they need re-orienting.
         updateWorldLabels()
         updateBodyLabels(lastBodyAttitude)
     }
@@ -316,6 +337,43 @@ class AttitudeScene(context: Context) {
     /** Reset the camera to the convention's default vantage. */
     fun resetCamera() {
         applyCurrentConvention()
+        pushCamera()
+    }
+
+    /**
+     * Move the camera to a head-on "front" view: eye on +Z looking at the origin
+     * with +Y up, preserving the current zoom radius. In this vantage world +X is
+     * screen-right, +Y is screen-up and +Z points toward the viewer — the only
+     * frame in which the Live (sensor) tilt mapping reads intuitively (phone
+     * pitch → body pitch, roll → roll, yaw → yaw), because the device's own
+     * frame (X right, Y up, Z toward the face) then coincides with what's on
+     * screen. Deliberately independent of the up-axis / handedness convention,
+     * which governs only the *default* vantage; "front view" is always this one.
+     */
+    fun faceView() {
+        val r = sqrt(
+            cameraPos[0] * cameraPos[0] +
+                cameraPos[1] * cameraPos[1] +
+                cameraPos[2] * cameraPos[2],
+        ).let { if (it < 1e-3f) 4.0f else it }
+        cameraPos[0] = 0f
+        cameraPos[1] = 0f
+        cameraPos[2] = r
+        worldUp[0] = 0f; worldUp[1] = 1f; worldUp[2] = 0f
+        pushCamera()
+    }
+
+    /**
+     * Set the camera co-rotation (see [viewRotation]). Pass [Quaternion.IDENTITY]
+     * for the default "world fixed, body rotates" view, or the body attitude for
+     * the "object locked to device, world rotates" view. Skips the camera push
+     * when unchanged, so the default view costs nothing even when called at the
+     * sensor rate (~50 Hz).
+     */
+    fun setViewRotation(q: Quaternion) {
+        val nq = q.normalized()
+        if (nq.approxEquals(viewRotation)) return
+        viewRotation = nq
         pushCamera()
     }
 
@@ -490,22 +548,24 @@ class AttitudeScene(context: Context) {
      * XY plane so it appears upright and front-facing.
      */
     private fun billboardTransform(tip: FloatArray): FloatArray {
-        var fx = cameraPos[0] - tip[0]
-        var fy = cameraPos[1] - tip[1]
-        var fz = cameraPos[2] - tip[2]
+        // Billboard against the *effective* eye/up (after viewRotation), so labels
+        // keep facing the real camera in the object-locked-to-device view too.
+        var fx = effectiveEye[0] - tip[0]
+        var fy = effectiveEye[1] - tip[1]
+        var fz = effectiveEye[2] - tip[2]
         val flen = sqrt(fx * fx + fy * fy + fz * fz)
         if (flen > 1e-6f) { fx /= flen; fy /= flen; fz /= flen }
 
-        // If forward is nearly parallel to worldUp, fall back to a horizontal up.
+        // If forward is nearly parallel to the up vector, fall back to a horizontal up.
         val ux: Float; val uy: Float; val uz: Float
-        val parallel = abs(fx * worldUp[0] + fy * worldUp[1] + fz * worldUp[2]) > 0.999f
+        val parallel = abs(fx * effectiveUp[0] + fy * effectiveUp[1] + fz * effectiveUp[2]) > 0.999f
         if (parallel) {
             // Pick any perpendicular up. Use world +X if we were aligned with +Y, else world +Y.
-            ux = if (worldUp[1] > 0.5f) 1f else 0f
-            uy = if (worldUp[1] > 0.5f) 0f else 1f
+            ux = if (effectiveUp[1] > 0.5f) 1f else 0f
+            uy = if (effectiveUp[1] > 0.5f) 0f else 1f
             uz = 0f
         } else {
-            ux = worldUp[0]; uy = worldUp[1]; uz = worldUp[2]
+            ux = effectiveUp[0]; uy = effectiveUp[1]; uz = effectiveUp[2]
         }
 
         // right = normalize(cross(up, forward))

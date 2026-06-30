@@ -132,4 +132,13 @@ class FilamentSurfaceView @JvmOverloads constructor(
     fun setWorldConvention(c: WorldConvention) = attitudeScene.setConvention(c)
 
     fun setBodyShape(shape: BodyShape) = attitudeScene.setBodyShape(shape)
+
+    /** Snap the camera to the head-on front view (see [AttitudeScene.faceView]),
+     *  the vantage in which Live (sensor) tilt maps 1:1 to on-screen rotation. */
+    fun faceView() = attitudeScene.faceView()
+
+    /** Co-rotate the camera with the body (object-locked-to-device view) when
+     *  passed the body attitude, or pass identity for the default world-fixed
+     *  view. See [AttitudeScene.setViewRotation]. */
+    fun setViewRotation(q: Quaternion) = attitudeScene.setViewRotation(q)
 }

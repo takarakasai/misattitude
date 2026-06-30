@@ -29,11 +29,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,6 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.takarakasai.misattitude.BuildConfig
@@ -63,12 +68,26 @@ import io.github.takarakasai.misattitude.gl.FilamentSurfaceView
 fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
+    // One-shot trigger for snapping the 3D camera to the head-on front view.
+    // Incrementing this is observed by FilamentCanvas, which calls faceView()
+    // exactly once per increment (deduped against the last applied value so the
+    // ~50 Hz recompositions in Live mode don't re-fire it every frame).
+    var faceViewTick by remember { mutableIntStateOf(0) }
+    // Live-mode display option: when true the body is held fixed on screen and
+    // the world frame rotates around it (camera co-rotates with the body). The
+    // attitude data / numbers are identical to the default view — only the
+    // vantage differs. Only meaningful while Live (sensor) mode is active.
+    var lockToDevice by remember { mutableStateOf(false) }
     // Resolve the hosting Activity once — needed to start the Play Billing
     // purchase flow, which (unlike most Android APIs) requires an Activity
     // rather than any Context. Wrapped in remember so the cast is paid once
     // per composition tree, not on every recomposition.
     val screenContext = LocalContext.current
     val activity = remember(screenContext) { screenContext.findActivity() }
+
+    // One-tap path into the Play purchase sheet, shared by every Pro-gated
+    // affordance on this screen (Live chip, tab walls, Remove-ads CTA).
+    val onBuyPro = { activity?.let(viewModel::launchProPurchase); Unit }
 
     // Animation pump while playing.
     LaunchedEffect(state.isPlaying) {
@@ -80,6 +99,23 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
             prev = now
             viewModel.advance(dt)
         }
+    }
+
+    // Battery hygiene for Live (sensor) mode: drop the sensor registration when
+    // the app is backgrounded and re-arm it on return. The ViewModel keeps the
+    // "live mode" intent across the pause, so resuming continues where it left
+    // off without losing the user's re-centered reference.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> viewModel.pauseSensor()
+                Lifecycle.Event.ON_RESUME -> viewModel.resumeSensor()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Android 15 (API 35) の edge-to-edge enforcement に対応。
@@ -111,20 +147,63 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                     ghost = viewModel.ghostQuaternion(state),
                     worldConvention = state.worldConvention,
                     bodyShape = state.bodyShape,
+                    faceViewTick = faceViewTick,
+                    // Object-locked view: co-rotate the camera with the body so it
+                    // appears fixed and the frame rotates. Only while Live + toggled.
+                    viewRotation = if (state.sensorActive && lockToDevice) {
+                        state.canonical
+                    } else {
+                        io.github.takarakasai.misattitude.domain.Quaternion.IDENTITY
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
 
-            // ─── Reset attitude button ───
+            // ─── Reset attitude + Live (sensor) toggle ───
+            // Reset is disabled while Live mode owns the attitude (the sensor
+            // equivalent is "Re-center", offered in the LiveSensorBar below).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(onClick = { viewModel.resetToIdentity() }, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = { viewModel.resetToIdentity() },
+                    enabled = !state.sensorActive,
+                    modifier = Modifier.weight(1f),
+                ) {
                     Text("Reset attitude (q = identity)")
                 }
+                LiveSensorChip(
+                    sensorActive = state.sensorActive,
+                    proActive = state.proActive,
+                    available = viewModel.sensorAvailable,
+                    onToggle = {
+                        val turningOn = !state.sensorActive
+                        viewModel.setSensorActive(turningOn)
+                        // Snap to the front view on enable so pitch/roll/yaw line
+                        // up with the phone the moment Live mode starts.
+                        if (turningOn) faceViewTick++
+                    },
+                    onLockedClick = onBuyPro,
+                )
+            }
+
+            // ─── Live (sensor) status / controls ───
+            // Only shown while live mode is active: a short hint plus a
+            // "Re-center" button that re-zeros the reference to the phone's
+            // current pose.
+            if (state.sensorActive) {
+                LiveSensorBar(
+                    lockToDevice = lockToDevice,
+                    onToggleLock = { lockToDevice = !lockToDevice },
+                    onRecenter = { viewModel.recenterSensor() },
+                    onFrontView = { faceViewTick++ },
+                    onStop = { viewModel.setSensorActive(false) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             // ─── Tabbed control panels ───
@@ -153,7 +232,6 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                 }
             }
 
-            val onBuyPro = { activity?.let(viewModel::launchProPurchase); Unit }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -244,9 +322,14 @@ private fun FilamentCanvas(
     ghost: io.github.takarakasai.misattitude.domain.Quaternion?,
     worldConvention: WorldConvention,
     bodyShape: BodyShape,
+    faceViewTick: Int,
+    viewRotation: io.github.takarakasai.misattitude.domain.Quaternion,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    // Last faceViewTick we acted on. update{} runs on every recomposition (≈50 Hz
+    // in Live mode), so we only call faceView() when the tick actually advances.
+    val appliedFaceTick = remember { mutableIntStateOf(0) }
     AndroidView(
         modifier = modifier,
         factory = { FilamentSurfaceView(context) },
@@ -256,6 +339,12 @@ private fun FilamentCanvas(
             view.setBodyAttitude(body)
             view.setStepAttitudes(steps?.first, steps?.second)
             view.setGhostAttitude(ghost)
+            // Cheap no-op (skipped internally) when identity, i.e. the default view.
+            view.setViewRotation(viewRotation)
+            if (faceViewTick != appliedFaceTick.intValue) {
+                appliedFaceTick.intValue = faceViewTick
+                view.faceView()
+            }
         },
         onRelease = { it.shutdown() },
     )
@@ -711,6 +800,121 @@ private fun BodyShapeChip(
             Text(if (locked) "🔒 ${shape.name}" else shape.name)
         },
     )
+}
+
+/**
+ * Pro-gated chip that toggles "Live (sensor)" mode. Mirrors the [BodyShapeChip]
+ * pattern: free users see a 🔒 and a tap routes to the purchase flow instead of
+ * enabling the feature, so the capability stays discoverable rather than hidden.
+ *
+ * For a Pro user on a device with no rotation-vector sensor the chip is shown
+ * disabled (nothing to enable). Free users always get the lock → purchase path,
+ * since sensor availability can't be promised before purchase anyway.
+ */
+@Composable
+private fun LiveSensorChip(
+    sensorActive: Boolean,
+    proActive: Boolean,
+    available: Boolean,
+    onToggle: () -> Unit,
+    onLockedClick: () -> Unit,
+) {
+    val locked = !proActive
+    FilterChip(
+        selected = sensorActive,
+        enabled = locked || available,
+        onClick = { if (locked) onLockedClick() else onToggle() },
+        label = {
+            Text(
+                when {
+                    locked -> "🔒 Live"
+                    sensorActive -> "📱 Live ●"
+                    else -> "📱 Live"
+                },
+            )
+        },
+    )
+}
+
+/**
+ * Status banner shown while Live (sensor) mode is active. Explains what's
+ * happening and offers the live-mode controls:
+ *   * Lock object to phone — toggles between the default "frame fixed, body
+ *     rotates" view and the "body fixed on screen, frame rotates around it"
+ *     view (camera co-rotates with the body). Same attitude / numbers either
+ *     way; it just demonstrates the relativity of the rotation.
+ *   * Re-center — re-zero so the phone's current pose becomes identity.
+ *   * Front view — snap the camera head-on so pitch / roll / yaw line up with
+ *     the phone (the tilt mapping only reads correctly from this vantage).
+ *   * Stop — leave live mode and return control to the manual editors.
+ *
+ * Laid out as a hint line, a mode toggle, and a button row so everything fits a
+ * phone width. Uses `tertiaryContainer` so it reads as a transient "mode is on"
+ * banner, distinct from the `primaryContainer` Pro / upgrade surfaces elsewhere.
+ */
+@Composable
+private fun LiveSensorBar(
+    lockToDevice: Boolean,
+    onToggleLock: () -> Unit,
+    onRecenter: () -> Unit,
+    onFrontView: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "🔴 LIVE — tilt your phone to rotate the body. " +
+                    "Tap Front view so pitch / roll / yaw line up.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(checked = lockToDevice, onCheckedChange = { onToggleLock() })
+                Text(
+                    text = "  Lock object to phone (frame rotates instead)",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onRecenter,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 8.dp,
+                        vertical = 2.dp,
+                    ),
+                ) { Text("Re-center", style = MaterialTheme.typography.labelMedium) }
+                OutlinedButton(
+                    onClick = onFrontView,
+                    modifier = Modifier.weight(1f),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 8.dp,
+                        vertical = 2.dp,
+                    ),
+                ) { Text("Front view", style = MaterialTheme.typography.labelMedium) }
+                OutlinedButton(
+                    onClick = onStop,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 8.dp,
+                        vertical = 2.dp,
+                    ),
+                ) { Text("Stop", style = MaterialTheme.typography.labelMedium) }
+            }
+        }
+    }
 }
 
 /** Common row layout used inside the bottom sheet: a fixed-width left label and a
