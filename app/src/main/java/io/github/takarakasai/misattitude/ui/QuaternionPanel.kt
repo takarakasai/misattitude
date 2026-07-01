@@ -22,8 +22,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import io.github.takarakasai.misattitude.R
 import io.github.takarakasai.misattitude.domain.Quaternion
 import kotlin.math.PI
 import kotlin.math.abs
@@ -117,15 +119,13 @@ fun QuaternionPanel(
         // *editing* the quaternion directly.
         if (!editable) {
             ProUpgradeInlineBanner(
-                message = "Quaternion editing is a Pro feature. Values update live as you " +
-                    "edit Euler / Matrix — upgrade to drag w/x/y/z directly.",
+                message = stringResource(R.string.quat_pro_message),
                 onBuyPro = onBuyPro,
             )
         }
 
         Text(
-            "Hamilton convention: q = w + x i + y j + z k. Sliders edit raw components in -1..+1; " +
-                "the value is normalised to a unit quaternion before being applied.",
+            stringResource(R.string.quat_hamilton_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -141,19 +141,19 @@ fun QuaternionPanel(
         val axisAngleText = run {
             val n2 = draftW * draftW + draftX * draftX + draftY * draftY + draftZ * draftZ
             if (n2 < 1e-9f) {
-                "axis = ?, angle = ? — draft norm is zero (move a slider)"
+                stringResource(R.string.quat_axis_angle_zero)
             } else {
                 val n = sqrt(n2.toDouble())
                 val w = (draftW.toDouble() / n).coerceIn(-1.0, 1.0)
                 val angleDeg = 2.0 * acos(w) * 180.0 / PI
                 val sinHalf = sqrt(1.0 - w * w)
                 if (sinHalf < 1e-9) {
-                    "axis = (1, 0, 0), angle = 0.00°  (identity)"
+                    stringResource(R.string.quat_axis_angle_identity)
                 } else {
                     val ax = draftX.toDouble() / n / sinHalf
                     val ay = draftY.toDouble() / n / sinHalf
                     val az = draftZ.toDouble() / n / sinHalf
-                    "axis = (%+.3f, %+.3f, %+.3f), angle = %.2f°".format(ax, ay, az, angleDeg)
+                    stringResource(R.string.quat_axis_angle, ax, ay, az, angleDeg)
                 }
             }
         }
@@ -216,7 +216,7 @@ internal fun ProUpgradeInlineBanner(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "🔒  $message",
+                text = stringResource(R.string.inline_banner, message),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.weight(1f),
             )

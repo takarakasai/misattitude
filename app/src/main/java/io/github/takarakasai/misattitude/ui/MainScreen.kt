@@ -46,6 +46,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -54,6 +55,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.takarakasai.misattitude.BuildConfig
+import io.github.takarakasai.misattitude.R
 import io.github.takarakasai.misattitude.domain.BodyShape
 import io.github.takarakasai.misattitude.ui.ads.AdBanner
 import io.github.takarakasai.misattitude.domain.EulerConvention
@@ -174,7 +176,7 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
                     enabled = !state.sensorActive,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Reset attitude (q = identity)")
+                    Text(stringResource(R.string.reset_attitude))
                 }
                 LiveSensorChip(
                     sensorActive = state.sensorActive,
@@ -215,12 +217,19 @@ fun MainScreen(viewModel: AttitudeViewModel = viewModel()) {
             // important so users discover what Pro unlocks rather than wondering
             // why a tab is missing.
             var tab by remember { mutableIntStateOf(0) }
-            val tabs = remember(state.proActive) {
-                if (state.proActive) {
-                    listOf("Euler", "Quaternion", "Matrix", "Playback")
-                } else {
-                    listOf("Euler", "🔒 Quaternion", "Matrix", "🔒 Playback")
-                }
+            val eulerTitle = stringResource(R.string.tab_euler)
+            val quaternionTitle = stringResource(R.string.tab_quaternion)
+            val matrixTitle = stringResource(R.string.tab_matrix)
+            val playbackTitle = stringResource(R.string.tab_playback)
+            val tabs = if (state.proActive) {
+                listOf(eulerTitle, quaternionTitle, matrixTitle, playbackTitle)
+            } else {
+                listOf(
+                    eulerTitle,
+                    stringResource(R.string.locked_label, quaternionTitle),
+                    matrixTitle,
+                    stringResource(R.string.locked_label, playbackTitle),
+                )
             }
             TabRow(selectedTabIndex = tab) {
                 tabs.forEachIndexed { index, title ->
@@ -382,7 +391,7 @@ private fun ConventionSummaryBar(
         ) {
             Icon(
                 imageVector = Icons.Filled.Tune,
-                contentDescription = "Open settings",
+                contentDescription = stringResource(R.string.summary_open_settings),
                 modifier = Modifier.size(20.dp),
             )
             Text(
@@ -439,11 +448,11 @@ private fun SettingsBottomSheet(
         ) {
             // ── World convention ──
             Text(
-                "World convention",
+                stringResource(R.string.settings_world_convention),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
-            SettingRow(label = "Up") {
+            SettingRow(label = stringResource(R.string.settings_up)) {
                 FilterChip(
                     selected = state.worldConvention.upAxis == UpAxis.Y,
                     onClick = { onUpAxisChange(UpAxis.Y) },
@@ -455,33 +464,33 @@ private fun SettingsBottomSheet(
                     label = { Text("Z") },
                 )
             }
-            SettingRow(label = "Hand") {
+            SettingRow(label = stringResource(R.string.settings_hand)) {
                 FilterChip(
                     selected = state.worldConvention.handedness == Handedness.RightHanded,
                     onClick = { onHandednessChange(Handedness.RightHanded) },
-                    label = { Text("RH") },
+                    label = { Text(stringResource(R.string.hand_rh)) },
                 )
                 FilterChip(
                     selected = state.worldConvention.handedness == Handedness.LeftHanded,
                     onClick = { onHandednessChange(Handedness.LeftHanded) },
-                    label = { Text("LH") },
+                    label = { Text(stringResource(R.string.hand_lh)) },
                 )
             }
-            SettingRow(label = "Preset") {
+            SettingRow(label = stringResource(R.string.settings_preset)) {
                 OutlinedButton(
                     onClick = onGraphicsPreset,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 10.dp,
                         vertical = 2.dp,
                     ),
-                ) { Text("Graphics (Y-up, RH)", style = MaterialTheme.typography.labelSmall) }
+                ) { Text(stringResource(R.string.settings_preset_graphics), style = MaterialTheme.typography.labelSmall) }
                 OutlinedButton(
                     onClick = onRoboticsPreset,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 10.dp,
                         vertical = 2.dp,
                     ),
-                ) { Text("Robotics (Z-up, RH)", style = MaterialTheme.typography.labelSmall) }
+                ) { Text(stringResource(R.string.settings_preset_robotics), style = MaterialTheme.typography.labelSmall) }
             }
 
             HorizontalDivider()
@@ -493,11 +502,11 @@ private fun SettingsBottomSheet(
             // deliberate conversion lever: free users see the cute Spot cow
             // exists and is one upgrade away.
             Text(
-                "Body shape",
+                stringResource(R.string.settings_body_shape),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
-            SettingRow(label = "Body") {
+            SettingRow(label = stringResource(R.string.settings_body)) {
                 BodyShapeChip(
                     shape = BodyShape.Cube,
                     selected = state.bodyShape == BodyShape.Cube,
@@ -536,14 +545,13 @@ private fun SettingsBottomSheet(
             // Pro-only entries appear in the dropdown with a 🔒 prefix; tapping
             // them launches the purchase flow.
             Text(
-                "Euler convention",
+                stringResource(R.string.settings_euler_convention),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
             if (!state.proActive) {
                 Text(
-                    text = "Free includes 4 conventions (ZYX intr/extr, ZYZ intr, XYZ intr). " +
-                        "Unlock all 12 with Pro.",
+                    text = stringResource(R.string.settings_free_conventions_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -582,33 +590,37 @@ private fun SettingsBottomSheet(
             // defaultConfig.versionName / versionCode に対応する。
             // 増えてきたら専用ダイアログ (ⓘ アイコンで開く) に分離するのが綺麗。
             Text(
-                "About",
+                stringResource(R.string.settings_about),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    "Misattitude  v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                    stringResource(
+                        R.string.settings_about_version,
+                        BuildConfig.VERSION_NAME,
+                        BuildConfig.VERSION_CODE,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
-                    "© takarakasai",
+                    stringResource(R.string.settings_about_copyright),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Includes:",
+                    stringResource(R.string.settings_about_includes),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "• Filament — Google (Apache 2.0)",
+                    stringResource(R.string.settings_about_filament),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "• Spot model — Keenan Crane (CC0 / Public Domain)",
+                    stringResource(R.string.settings_about_spot),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -627,25 +639,23 @@ private fun SettingsBottomSheet(
             // Price text comes from Google Play (already-localised currency
             // string from ProductDetails) so we never hard-code "$5" in code.
             Text(
-                "Pro upgrade",
+                stringResource(R.string.settings_pro_upgrade),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
             if (state.proActive) {
                 Text(
-                    "✓  Pro version active — ads disabled",
+                    stringResource(R.string.settings_pro_active),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 OutlinedButton(
                     onClick = onRestorePurchases,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Restore purchases") }
+                ) { Text(stringResource(R.string.settings_restore_purchases)) }
             } else {
                 Text(
-                    "Remove the banner ad with a one-time purchase. Lifetime entitlement, " +
-                        "applied automatically across all your devices signed in to the " +
-                        "same Google account.",
+                    stringResource(R.string.settings_pro_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -657,12 +667,17 @@ private fun SettingsBottomSheet(
                         onClick = onBuyPro,
                         modifier = Modifier.weight(1f),
                     ) {
-                        val priceTail = if (proPriceFormatted.isNotEmpty()) "  —  $proPriceFormatted" else ""
-                        Text("Remove ads$priceTail")
+                        Text(
+                            if (proPriceFormatted.isNotEmpty()) {
+                                stringResource(R.string.settings_remove_ads_price, proPriceFormatted)
+                            } else {
+                                stringResource(R.string.settings_remove_ads)
+                            },
+                        )
                     }
                     OutlinedButton(
                         onClick = onRestorePurchases,
-                    ) { Text("Restore") }
+                    ) { Text(stringResource(R.string.settings_restore)) }
                 }
             }
 
@@ -743,11 +758,11 @@ private fun RemoveAdsCta(
             // right hug its content while this column absorbs slack.
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Remove ads forever",
+                    text = stringResource(R.string.cta_headline),
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Text(
-                    text = "Support development · one-time purchase",
+                    text = stringResource(R.string.cta_subline),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
                 )
@@ -797,7 +812,7 @@ private fun BodyShapeChip(
         selected = selected,
         onClick = { if (locked) onLockedClick() else onSelect(shape) },
         label = {
-            Text(if (locked) "🔒 ${shape.name}" else shape.name)
+            Text(if (locked) stringResource(R.string.locked_label, shape.name) else shape.name)
         },
     )
 }
@@ -826,11 +841,13 @@ private fun LiveSensorChip(
         onClick = { if (locked) onLockedClick() else onToggle() },
         label = {
             Text(
-                when {
-                    locked -> "🔒 Live"
-                    sensorActive -> "📱 Live ●"
-                    else -> "📱 Live"
-                },
+                stringResource(
+                    when {
+                        locked -> R.string.live_chip_locked
+                        sensorActive -> R.string.live_chip_active
+                        else -> R.string.live_chip_idle
+                    },
+                ),
             )
         },
     )
@@ -874,14 +891,13 @@ private fun LiveSensorBar(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = "🔴 LIVE — tilt your phone to rotate the body. " +
-                    "Tap Front view so pitch / roll / yaw line up.",
+                text = stringResource(R.string.live_bar_hint),
                 style = MaterialTheme.typography.bodySmall,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(checked = lockToDevice, onCheckedChange = { onToggleLock() })
                 Text(
-                    text = "  Lock object to phone (frame rotates instead)",
+                    text = stringResource(R.string.live_lock_object),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -896,7 +912,7 @@ private fun LiveSensorBar(
                         horizontal = 8.dp,
                         vertical = 2.dp,
                     ),
-                ) { Text("Re-center", style = MaterialTheme.typography.labelMedium) }
+                ) { Text(stringResource(R.string.live_recenter), style = MaterialTheme.typography.labelMedium) }
                 OutlinedButton(
                     onClick = onFrontView,
                     modifier = Modifier.weight(1f),
@@ -904,14 +920,14 @@ private fun LiveSensorBar(
                         horizontal = 8.dp,
                         vertical = 2.dp,
                     ),
-                ) { Text("Front view", style = MaterialTheme.typography.labelMedium) }
+                ) { Text(stringResource(R.string.live_front_view), style = MaterialTheme.typography.labelMedium) }
                 OutlinedButton(
                     onClick = onStop,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 8.dp,
                         vertical = 2.dp,
                     ),
-                ) { Text("Stop", style = MaterialTheme.typography.labelMedium) }
+                ) { Text(stringResource(R.string.live_stop), style = MaterialTheme.typography.labelMedium) }
             }
         }
     }

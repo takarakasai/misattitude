@@ -26,9 +26,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.takarakasai.misattitude.R
 import io.github.takarakasai.misattitude.domain.Axis
 import io.github.takarakasai.misattitude.domain.Conversions
 import io.github.takarakasai.misattitude.domain.EulerAngles
@@ -104,7 +106,7 @@ fun EulerPanel(
         } else if (isNearLock) {
             AssistChip(
                 onClick = {},
-                label = { Text("Approaching gimbal lock — a1 and a3 are losing independence") },
+                label = { Text(stringResource(R.string.euler_near_gimbal_lock)) },
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = Color(0xFFFFF4D9),
                     labelColor = Color(0xFF7A5A00),
@@ -120,27 +122,31 @@ fun EulerPanel(
             else -> WarnLevel.None
         }
         AngleSlider(
-            label = "${convention.axis1.name}₁ (a1)",
+            label = stringResource(R.string.euler_slider_a1, convention.axis1.name),
             valueDeg = angles.a1.toDeg(),
             warning = warnLevel,
             onChange = { newDeg -> onAnglesChange(EulerAngles(newDeg.toRad(), angles.a2, angles.a3)) },
         )
         AngleSlider(
-            label = "${convention.axis2.name}₂ (a2)",
+            label = stringResource(R.string.euler_slider_a2, convention.axis2.name),
             valueDeg = angles.a2.toDeg(),
             range = if (convention.isTaitBryan) -90f..90f else 0f..180f,
             warning = WarnLevel.None,
             onChange = { newDeg -> onAnglesChange(EulerAngles(angles.a1, newDeg.toRad(), angles.a3)) },
         )
         AngleSlider(
-            label = "${convention.axis3.name}₃ (a3)",
+            label = stringResource(R.string.euler_slider_a3, convention.axis3.name),
             valueDeg = angles.a3.toDeg(),
             warning = warnLevel,
             onChange = { newDeg -> onAnglesChange(EulerAngles(angles.a1, angles.a2, newDeg.toRad())) },
         )
 
         Text(
-            text = "${convention.label} — apply rotations as: " + composeOrderText(convention),
+            text = stringResource(
+                R.string.euler_compose_help,
+                convention.label,
+                composeOrderText(convention),
+            ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -149,21 +155,25 @@ fun EulerPanel(
 
 private fun degreesAsRad(d: Double): Double = d * PI / 180.0
 
+@Composable
 private fun gimbalLockMessage(c: EulerConvention): String {
     val a1 = "${c.axis1.name}₁"
     val a3 = "${c.axis3.name}₃"
-    val cause = if (c.isTaitBryan) "a2 = ±90°" else "a2 = 0° or 180°"
-    return "Gimbal lock ($cause): $a1 and $a3 axes coincide, a3 pinned to 0°"
+    val cause = stringResource(
+        if (c.isTaitBryan) R.string.euler_gimbal_cause_taitbryan else R.string.euler_gimbal_cause_proper,
+    )
+    return stringResource(R.string.euler_gimbal_lock, cause, a1, a3)
 }
 
 private enum class WarnLevel { None, Near, Lock }
 
+@Composable
 private fun composeOrderText(c: EulerConvention): String {
     val a = listOf(c.axis1.name, c.axis2.name, c.axis3.name)
     return if (c.frame == FrameKind.Intrinsic) {
-        "rotate a1 about ${a[0]}ₒ, then a2 about new ${a[1]}ₒ, then a3 about new ${a[2]}ₒ"
+        stringResource(R.string.euler_compose_intrinsic, a[0], a[1], a[2])
     } else {
-        "rotate a1 about world ${a[0]}, then a2 about world ${a[1]}, then a3 about world ${a[2]}"
+        stringResource(R.string.euler_compose_extrinsic, a[0], a[1], a[2])
     }
 }
 
@@ -238,11 +248,14 @@ fun ConventionPicker(
     val current = AxisOrder(convention.axis1, convention.axis2, convention.axis3, convention.isProperEuler)
 
     OutlinedButton(onClick = { expanded = true }, modifier = modifier) {
-        Text("Order: ${current.label}${if (current.isProper) "  · proper" else "  · Tait-Bryan"}")
+        val suffix = stringResource(
+            if (current.isProper) R.string.euler_order_proper else R.string.euler_order_taitbryan,
+        )
+        Text(stringResource(R.string.euler_order_button, current.label, suffix))
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
         Text(
-            "Tait-Bryan",
+            stringResource(R.string.euler_header_taitbryan),
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -260,7 +273,7 @@ fun ConventionPicker(
             )
         }
         Text(
-            "Proper Euler",
+            stringResource(R.string.euler_header_proper),
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -301,7 +314,7 @@ private fun DropdownEntry(
     DropdownMenuItem(
         text = {
             Text(
-                text = if (locked) "🔒  ${order.label}" else order.label,
+                text = if (locked) stringResource(R.string.euler_dropdown_locked, order.label) else order.label,
                 color = if (locked) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
@@ -328,7 +341,9 @@ fun FrameSwitch(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = if (convention.frame == FrameKind.Intrinsic) "Intrinsic" else "Extrinsic",
+            text = stringResource(
+                if (convention.frame == FrameKind.Intrinsic) R.string.frame_intrinsic else R.string.frame_extrinsic,
+            ),
             modifier = Modifier.padding(end = 6.dp),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,

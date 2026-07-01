@@ -21,8 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import io.github.takarakasai.misattitude.R
 
 @Composable
 fun PlaybackPanel(
@@ -53,16 +55,19 @@ fun PlaybackPanel(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onCaptureStart, modifier = Modifier.weight(1f)) {
-                Text("Set start = current")
+                Text(stringResource(R.string.pb_set_start))
             }
             OutlinedButton(onClick = onCaptureEnd, modifier = Modifier.weight(1f)) {
-                Text("Set end = current")
+                Text(stringResource(R.string.pb_set_end))
             }
         }
 
         Text(
-            "Start q: " + formatQuat(state.start.w, state.start.x, state.start.y, state.start.z) + "\n" +
-            "End   q: " + formatQuat(state.end.w, state.end.x, state.end.y, state.end.z),
+            stringResource(
+                R.string.pb_start_end,
+                formatQuat(state.start.w, state.start.x, state.start.y, state.start.z),
+                formatQuat(state.end.w, state.end.x, state.end.y, state.end.z),
+            ),
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
         )
 
@@ -70,22 +75,22 @@ fun PlaybackPanel(
             FilterChip(
                 selected = state.playbackMode == PlaybackMode.Slerp,
                 onClick = { onModeChange(PlaybackMode.Slerp) },
-                label = { Text("Slerp") },
+                label = { Text(stringResource(R.string.pb_mode_slerp)) },
             )
             FilterChip(
                 selected = state.playbackMode == PlaybackMode.EulerLerp,
                 onClick = { onModeChange(PlaybackMode.EulerLerp) },
-                label = { Text("Euler-LERP") },
+                label = { Text(stringResource(R.string.pb_mode_eulerlerp)) },
             )
             FilterChip(
                 selected = state.playbackMode == PlaybackMode.Step,
                 onClick = { onModeChange(PlaybackMode.Step) },
-                label = { Text("Step (3-axis)") },
+                label = { Text(stringResource(R.string.pb_mode_step)) },
             )
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("t = %.2f".format(state.playbackT),
+            Text(stringResource(R.string.pb_t, state.playbackT),
                 style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 modifier = Modifier.padding(end = 8.dp))
             Slider(
@@ -102,22 +107,22 @@ fun PlaybackPanel(
                     imageVector = if (state.isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
                     contentDescription = null,
                 )
-                Text(if (state.isPlaying) "  Pause" else "  Play")
+                Text(stringResource(if (state.isPlaying) R.string.pb_pause else R.string.pb_play))
             }
             OutlinedButton(onClick = onReset, modifier = Modifier.weight(1f)) {
                 Icon(imageVector = Icons.Filled.Refresh, contentDescription = null)
-                Text("  Reset to t = 0")
+                Text(stringResource(R.string.pb_reset))
             }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(checked = state.showSteps, onCheckedChange = { onToggleSteps() })
-            Text("  Show step axes (current attitude's 3-axis decomposition)",
+            Text(stringResource(R.string.pb_show_steps),
                 style = MaterialTheme.typography.bodyMedium)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(checked = state.showComparison, onCheckedChange = { onToggleComparison() })
-            Text("  Comparison ghost (other interpolation as translucent body)",
+            Text(stringResource(R.string.pb_comparison_ghost),
                 style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -156,28 +161,22 @@ private fun PlaybackProWall(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "🔒  Playback is a Pro feature",
+                text = stringResource(R.string.pb_wall_title),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Record two attitudes (start / end) and watch them interpolate as " +
-                    "either a quaternion Slerp or an Euler-LERP — side-by-side with a ghost " +
-                    "of the other so the geometric difference between them is unmistakable. " +
-                    "Step mode lets you decompose any attitude into the three sequential " +
-                    "axis rotations of the active Euler convention.",
+                text = stringResource(R.string.pb_wall_desc),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "• Slerp vs Euler-LERP comparison\n" +
-                    "• Step-by-step 3-axis decomposition\n" +
-                    "• Play / pause / scrub through the path",
+                text = stringResource(R.string.pb_wall_bullets),
                 style = MaterialTheme.typography.bodySmall,
             )
             Button(
                 onClick = onBuyPro,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Unlock Playback with Pro")
+                Text(stringResource(R.string.pb_wall_button))
             }
         }
     }

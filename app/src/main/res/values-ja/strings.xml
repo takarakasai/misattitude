@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- app_name はブランド名なので翻訳しない（values/ の値を継承） -->
+
+    <!-- Generic -->
+    <string name="locked_label">🔒 %1$s</string>
+
+    <!-- ─── メイン画面 ─── -->
+    <string name="reset_attitude">姿勢をリセット (q = 単位元)</string>
+    <string name="tab_euler">オイラー角</string>
+    <string name="tab_quaternion">四元数</string>
+    <string name="tab_matrix">回転行列</string>
+    <string name="tab_playback">再生</string>
+    <string name="summary_open_settings">設定</string>
+
+    <!-- ライブ（センサー）モード -->
+    <string name="live_chip_locked">🔒 ライブ</string>
+    <string name="live_chip_active">📱 ライブ ●</string>
+    <string name="live_chip_idle">📱 ライブ</string>
+    <string name="live_bar_hint">🔴 ライブ — スマホを傾けると本体が回転します。ピッチ / ロール / ヨーを合わせるには「正面表示」をタップ。</string>
+    <string name="live_lock_object">"  本体をスマホに固定 (代わりに座標系が回転)"</string>
+    <string name="live_recenter">再センタリング</string>
+    <string name="live_front_view">正面表示</string>
+    <string name="live_stop">停止</string>
+
+    <!-- 広告削除の CTA -->
+    <string name="cta_headline">広告を完全に削除</string>
+    <string name="cta_subline">開発を支援 · 買い切り</string>
+
+    <!-- ─── 設定シート ─── -->
+    <string name="settings_world_convention">全般</string>
+    <string name="settings_up">上方向</string>
+    <string name="settings_hand">座標系</string>
+    <string name="hand_rh">右手系</string>
+    <string name="hand_lh">左手系</string>
+    <string name="settings_preset">プリセット</string>
+    <string name="settings_preset_graphics">Graphics (Y-up, RH)</string>
+    <string name="settings_preset_robotics">Robotics (Z-up, RH)</string>
+    <string name="settings_body_shape">ボディ形状</string>
+    <string name="settings_body">ボディ</string>
+    <string name="settings_euler_convention">オイラー角</string>
+    <string name="settings_free_conventions_note">無料版は4規約 (ZYX intr/extr, ZYZ intr, XYZ intr) を含みます。Pro で全12規約を解放。</string>
+    <string name="settings_about">アプリ情報</string>
+    <string name="settings_about_version">"Misattitude  v%1$s (build %2$d)"</string>
+    <string name="settings_about_copyright">© takarakasai</string>
+    <string name="settings_about_includes">使用ライブラリ:</string>
+    <string name="settings_about_filament">• Filament — Google (Apache 2.0)</string>
+    <string name="settings_about_spot">• Spot モデル — Keenan Crane (CC0 / パブリックドメイン)</string>
+    <string name="settings_pro_upgrade">Pro アップグレード</string>
+    <string name="settings_pro_active">"✓  Pro 版が有効 — 広告は無効です"</string>
+    <string name="settings_restore_purchases">購入を復元</string>
+    <string name="settings_pro_desc">買い切りでバナー広告を削除します。永続的な権利で、同じ Google アカウントでサインインした全端末に自動的に適用されます。</string>
+    <string name="settings_remove_ads">広告を削除</string>
+    <string name="settings_remove_ads_price">"広告を削除  —  %1$s"</string>
+    <string name="settings_restore">復元</string>
+
+    <!-- ─── オイラー角パネル ─── -->
+    <string name="euler_near_gimbal_lock">ジンバルロックに接近 — a1 と a3 の独立性が失われつつあります</string>
+    <string name="euler_gimbal_lock">ジンバルロック (%1$s): %2$s 軸と %3$s 軸が一致、a3 は 0° に固定</string>
+    <string name="euler_gimbal_cause_taitbryan">a2 = ±90°</string>
+    <string name="euler_gimbal_cause_proper">a2 = 0° または 180°</string>
+    <string name="euler_slider_a1">%1$s₁ (a1)</string>
+    <string name="euler_slider_a2">%1$s₂ (a2)</string>
+    <string name="euler_slider_a3">%1$s₃ (a3)</string>
+    <string name="euler_compose_help">%1$s — 回転の適用順: %2$s</string>
+    <string name="euler_compose_intrinsic">%1$sₒ まわりに a1、次に新しい %2$sₒ まわりに a2、次に新しい %3$sₒ まわりに a3</string>
+    <string name="euler_compose_extrinsic">ワールド %1$s まわりに a1、次にワールド %2$s まわりに a2、次にワールド %3$s まわりに a3</string>
+    <string name="euler_order_button">順序: %1$s%2$s</string>
+    <string name="euler_order_proper">"  · proper"</string>
+    <string name="euler_order_taitbryan">"  · Tait-Bryan"</string>
+    <string name="euler_header_taitbryan">Tait-Bryan</string>
+    <string name="euler_header_proper">Proper Euler</string>
+    <string name="euler_dropdown_locked">"🔒  %1$s"</string>
+    <string name="frame_intrinsic">内在 (Intrinsic)</string>
+    <string name="frame_extrinsic">外在 (Extrinsic)</string>
+
+    <!-- ─── 四元数パネル ─── -->
+    <string name="quat_pro_message">四元数の編集は Pro 機能です。オイラー角 / 行列を編集すると値がライブ更新されます — Pro で w/x/y/z を直接ドラッグできます。</string>
+    <string name="quat_hamilton_desc">Hamilton 規約: q = w + x i + y j + z k。スライダーは生の成分を -1..+1 で編集し、適用前に単位四元数へ正規化されます。</string>
+    <string name="quat_axis_angle_zero">axis = ?, angle = ? — ドラフトのノルムが 0 です (スライダーを動かしてください)</string>
+    <string name="quat_axis_angle_identity">"axis = (1, 0, 0), angle = 0.00°  (単位元)"</string>
+    <string name="quat_axis_angle">axis = (%1$+.3f, %2$+.3f, %3$+.3f), angle = %4$.2f°</string>
+    <string name="inline_banner">"🔒  %1$s"</string>
+
+    <!-- ─── 行列パネル ─── -->
+    <string name="matrix_desc">ボディ→ワールド回転行列 R。v_world = R · v_body。セルをタップするとスライダーで編集できます。変更ごとに再正規直交化されるため、他の成分で値が決まるセルはドラッグしても戻ることがあります。</string>
+    <string name="matrix_det">"det(R) = %1$+.6f  (正しい回転なら +1)"</string>
+    <string name="matrix_editing">編集中 m[%1$d, %2$d]</string>
+    <string name="matrix_editing_value">"  =  %1$+.4f"</string>
+
+    <!-- ─── 再生パネル ─── -->
+    <string name="pb_set_start">開始 = 現在の姿勢</string>
+    <string name="pb_set_end">終了 = 現在の姿勢</string>
+    <string name="pb_start_end">"開始 q: %1$s\n終了 q: %2$s"</string>
+    <string name="pb_mode_slerp">Slerp</string>
+    <string name="pb_mode_eulerlerp">Euler-LERP</string>
+    <string name="pb_mode_step">ステップ (3軸)</string>
+    <string name="pb_t">t = %1$.2f</string>
+    <string name="pb_pause">"  一時停止"</string>
+    <string name="pb_play">"  再生"</string>
+    <string name="pb_reset">"  t = 0 にリセット"</string>
+    <string name="pb_show_steps">"  ステップ軸を表示 (現在姿勢の3軸分解)"</string>
+    <string name="pb_comparison_ghost">"  比較ゴースト (もう一方の補間を半透明ボディで)"</string>
+    <string name="pb_wall_title">"🔒  再生は Pro 機能です"</string>
+    <string name="pb_wall_desc">2つの姿勢 (開始 / 終了) を記録し、四元数 Slerp か Euler-LERP で補間される様子を確認できます。もう一方をゴーストで並べて表示するので、両者の幾何学的な違いが一目瞭然です。ステップモードでは、任意の姿勢を現在のオイラー角規約の3つの軸回転へ順番に分解できます。</string>
+    <string name="pb_wall_bullets">• Slerp と Euler-LERP の比較\n• ステップごとの3軸分解\n• 経路の再生 / 一時停止 / スクラブ</string>
+    <string name="pb_wall_button">機能アンロック（Pro）</string>
+</resources>

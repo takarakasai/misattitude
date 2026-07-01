@@ -1,4 +1,108 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Misattitude</string>
+
+    <!-- Generic -->
+    <string name="locked_label">🔒 %1$s</string>
+
+    <!-- ─── Main screen ─── -->
+    <string name="reset_attitude">Reset attitude (q = identity)</string>
+    <string name="tab_euler">Euler</string>
+    <string name="tab_quaternion">Quaternion</string>
+    <string name="tab_matrix">Matrix</string>
+    <string name="tab_playback">Playback</string>
+    <string name="summary_open_settings">Settings</string>
+
+    <!-- Live (sensor) mode -->
+    <string name="live_chip_locked">🔒 Live</string>
+    <string name="live_chip_active">📱 Live ●</string>
+    <string name="live_chip_idle">📱 Live</string>
+    <string name="live_bar_hint">🔴 LIVE — tilt your phone to rotate the body. Tap Front view so pitch / roll / yaw line up.</string>
+    <string name="live_lock_object">"  Lock object to phone (frame rotates instead)"</string>
+    <string name="live_recenter">Re-center</string>
+    <string name="live_front_view">Front view</string>
+    <string name="live_stop">Stop</string>
+
+    <!-- Remove-ads call-to-action -->
+    <string name="cta_headline">Remove ads forever</string>
+    <string name="cta_subline">Support development · one-time purchase</string>
+
+    <!-- ─── Settings bottom sheet ─── -->
+    <string name="settings_world_convention">General</string>
+    <string name="settings_up">Up</string>
+    <string name="settings_hand">Coords</string>
+    <string name="hand_rh">RH</string>
+    <string name="hand_lh">LH</string>
+    <string name="settings_preset">Preset</string>
+    <string name="settings_preset_graphics">Graphics (Y-up, RH)</string>
+    <string name="settings_preset_robotics">Robotics (Z-up, RH)</string>
+    <string name="settings_body_shape">Body shape</string>
+    <string name="settings_body">Body</string>
+    <string name="settings_euler_convention">Euler</string>
+    <string name="settings_free_conventions_note">Free includes 4 conventions (ZYX intr/extr, ZYZ intr, XYZ intr). Unlock all 12 with Pro.</string>
+    <string name="settings_about">About</string>
+    <string name="settings_about_version">"Misattitude  v%1$s (build %2$d)"</string>
+    <string name="settings_about_copyright">© takarakasai</string>
+    <string name="settings_about_includes">Includes:</string>
+    <string name="settings_about_filament">• Filament — Google (Apache 2.0)</string>
+    <string name="settings_about_spot">• Spot model — Keenan Crane (CC0 / Public Domain)</string>
+    <string name="settings_pro_upgrade">Pro upgrade</string>
+    <string name="settings_pro_active">"✓  Pro version active — ads disabled"</string>
+    <string name="settings_restore_purchases">Restore purchases</string>
+    <string name="settings_pro_desc">Remove the banner ad with a one-time purchase. Lifetime entitlement, applied automatically across all your devices signed in to the same Google account.</string>
+    <string name="settings_remove_ads">Remove ads</string>
+    <string name="settings_remove_ads_price">"Remove ads  —  %1$s"</string>
+    <string name="settings_restore">Restore</string>
+
+    <!-- ─── Euler panel ─── -->
+    <string name="euler_near_gimbal_lock">Approaching gimbal lock — a1 and a3 are losing independence</string>
+    <string name="euler_gimbal_lock">Gimbal lock (%1$s): %2$s and %3$s axes coincide, a3 pinned to 0°</string>
+    <string name="euler_gimbal_cause_taitbryan">a2 = ±90°</string>
+    <string name="euler_gimbal_cause_proper">a2 = 0° or 180°</string>
+    <string name="euler_slider_a1">%1$s₁ (a1)</string>
+    <string name="euler_slider_a2">%1$s₂ (a2)</string>
+    <string name="euler_slider_a3">%1$s₃ (a3)</string>
+    <string name="euler_compose_help">%1$s — apply rotations as: %2$s</string>
+    <string name="euler_compose_intrinsic">rotate a1 about %1$sₒ, then a2 about new %2$sₒ, then a3 about new %3$sₒ</string>
+    <string name="euler_compose_extrinsic">rotate a1 about world %1$s, then a2 about world %2$s, then a3 about world %3$s</string>
+    <string name="euler_order_button">Order: %1$s%2$s</string>
+    <string name="euler_order_proper">"  · proper"</string>
+    <string name="euler_order_taitbryan">"  · Tait-Bryan"</string>
+    <string name="euler_header_taitbryan">Tait-Bryan</string>
+    <string name="euler_header_proper">Proper Euler</string>
+    <string name="euler_dropdown_locked">"🔒  %1$s"</string>
+    <string name="frame_intrinsic">Intrinsic</string>
+    <string name="frame_extrinsic">Extrinsic</string>
+
+    <!-- ─── Quaternion panel ─── -->
+    <string name="quat_pro_message">Quaternion editing is a Pro feature. Values update live as you edit Euler / Matrix — upgrade to drag w/x/y/z directly.</string>
+    <string name="quat_hamilton_desc">Hamilton convention: q = w + x i + y j + z k. Sliders edit raw components in -1..+1; the value is normalised to a unit quaternion before being applied.</string>
+    <string name="quat_axis_angle_zero">axis = ?, angle = ? — draft norm is zero (move a slider)</string>
+    <string name="quat_axis_angle_identity">"axis = (1, 0, 0), angle = 0.00°  (identity)"</string>
+    <string name="quat_axis_angle">axis = (%1$+.3f, %2$+.3f, %3$+.3f), angle = %4$.2f°</string>
+    <string name="inline_banner">"🔒  %1$s"</string>
+
+    <!-- ─── Matrix panel ─── -->
+    <string name="matrix_desc">Body→world rotation matrix R. v_world = R · v_body. Tap a cell to edit it via the slider; the matrix is re-orthonormalised on every change, so cells whose value is fully determined by the others may snap back as you drag.</string>
+    <string name="matrix_det">"det(R) = %1$+.6f  (should be +1 for a proper rotation)"</string>
+    <string name="matrix_editing">Editing m[%1$d, %2$d]</string>
+    <string name="matrix_editing_value">"  =  %1$+.4f"</string>
+
+    <!-- ─── Playback panel ─── -->
+    <string name="pb_set_start">Set start = current</string>
+    <string name="pb_set_end">Set end = current</string>
+    <string name="pb_start_end">"Start q: %1$s\nEnd   q: %2$s"</string>
+    <string name="pb_mode_slerp">Slerp</string>
+    <string name="pb_mode_eulerlerp">Euler-LERP</string>
+    <string name="pb_mode_step">Step (3-axis)</string>
+    <string name="pb_t">t = %1$.2f</string>
+    <string name="pb_pause">"  Pause"</string>
+    <string name="pb_play">"  Play"</string>
+    <string name="pb_reset">"  Reset to t = 0"</string>
+    <string name="pb_show_steps">"  Show step axes (current attitude's 3-axis decomposition)"</string>
+    <string name="pb_comparison_ghost">"  Comparison ghost (other interpolation as translucent body)"</string>
+    <string name="pb_wall_title">"🔒  Playback is a Pro feature"</string>
+    <string name="pb_wall_desc">Record two attitudes (start / end) and watch them interpolate as either a quaternion Slerp or an Euler-LERP — side-by-side with a ghost of the other so the geometric difference between them is unmistakable. Step mode lets you decompose any attitude into the three sequential axis rotations of the active Euler convention.</string>
+    <string name="pb_wall_bullets">• Slerp vs Euler-LERP comparison\n• Step-by-step 3-axis decomposition\n• Play / pause / scrub through the path</string>
+    <string name="pb_wall_button">Unlock with Pro</string>
 </resources>

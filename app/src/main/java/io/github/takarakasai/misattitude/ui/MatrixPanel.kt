@@ -20,10 +20,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.takarakasai.misattitude.R
 import io.github.takarakasai.misattitude.domain.Conversions
 import io.github.takarakasai.misattitude.domain.Quaternion
 import io.github.takarakasai.misattitude.domain.RotationMatrix
@@ -61,9 +63,7 @@ fun MatrixPanel(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "Body→world rotation matrix R. v_world = R · v_body. " +
-                "Tap a cell to edit it via the slider; the matrix is re-orthonormalised on every change, " +
-                "so cells whose value is fully determined by the others may snap back as you drag.",
+            stringResource(R.string.matrix_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -89,7 +89,7 @@ fun MatrixPanel(
             }
         }
         Text(
-            "det(R) = %+.6f  (should be +1 for a proper rotation)".format(det),
+            stringResource(R.string.matrix_det, det),
             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         )
 
@@ -109,12 +109,12 @@ fun MatrixPanel(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Editing m[$r, $c]",
+                        stringResource(R.string.matrix_editing, r, c),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "  =  %+.4f".format(m[r, c]),
+                        stringResource(R.string.matrix_editing_value, m[r, c]),
                         style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                     )
                 }

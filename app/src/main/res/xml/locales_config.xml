@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Per-app language list (Android 13+ / API 33). Declaring android:localeConfig
+    on <application> surfaces a per-app "Language" picker under
+    Settings → Apps → Misattitude, letting a user pick this app's language
+    independently of the system language.
+
+    On Android 12 and below (this app's minSdk is 26) the OS picker is not
+    shown; those devices fall back to matching the system language against the
+    available resource qualifiers (values/ = en default, values-ja/ = Japanese).
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ja" />
+</locale-config>
